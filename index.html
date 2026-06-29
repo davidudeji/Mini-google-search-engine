@@ -4,109 +4,144 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DavSearch</title>
+    <meta name="description"
+        content="DavSearch — a client-side search engine with TF-IDF ranking, fuzzy typo-tolerance, and live inverted index built in vanilla JavaScript.">
+    <title>DavSearch — Client-Side Search Engine</title>
+
+    <!-- Google Fonts: display headings, body, and monospace code -->
     <link
         href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&family=Roboto:wght@300;400;500&family=JetBrains+Mono:wght@400;500&display=swap"
         rel="stylesheet">
-    <link rel="stylesheet" href="https://fonts.googleapis.com" />
-    <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons" />
-    <link rel="stylesheet" href="/src/styles/base.css">;
-
-
-
+    <!-- Material Icons for the search icon in the home bar -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+    <link rel="stylesheet" href="src/styles/base.css">
 </head>
 
 <body>
 
-    <!-- ═══════════════ HOME PAGE ═══════════════ -->
+    <!-- ══════════════════════════════════════════════════════════════
+         GLOBAL DRAG-AND-DROP OVERLAY
+         Full-page overlay shown when the user drags a file anywhere
+         over the window. Handled by setupGlobalDrop() in uploader.js.
+    ════════════════════════════════════════════════════════════════ -->
+    <div id="globalDropOverlay" class="global-drop-overlay">
+        <div class="drop-target-inner">
+            <div class="drop-icon">📂</div>
+            <div class="drop-label">Drop files to index</div>
+            <div class="drop-sub">.txt or .md files · max 10MB each</div>
+        </div>
+    </div>
+
+    <!-- Loading indicator shown while FileReader processes files -->
+    <div id="loadingIndicator" class="loading-indicator" style="display:none">
+        <div class="loading-spinner"></div>
+        <span>Indexing documents…</span>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════════════
+         HOME PAGE (pre-search state)
+    ════════════════════════════════════════════════════════════════ -->
     <div id="homePage">
         <div class="home-logo">
             <span class="logo-d">D</span><span class="logo-a">a</span><span class="logo-v">v</span><span
-                class="logo-s">S</span><span class="logo-e2">e</span><span class="logo-a">a</span><span
+                class="logo-s">S</span><span class="logo-e2">e</span><span class="logo-a2">a</span><span
                 class="logo-r">r</span><span class="logo-c">c</span><span class="logo-h">h</span>
         </div>
 
         <div class="search-bar-wrap" id="homeBarWrap">
             <div class="search-bar" id="homeBar">
-                <span class="material-symbols-outlined">
-                    search
-                </span>
-                <input class="search-input" id="homeInput" placeholder="Search your documents…" autocomplete="on">
+                <span class="material-icons search-icon-left" style="font-size:20px;color:var(--text-muted)">search</span>
+                <input class="search-input" id="homeInput" placeholder="Search your documents…" autocomplete="off"
+                    aria-label="Search your indexed documents">
                 <div class="search-bar-right">
-                    <button class="icon-btn" id="homeClear" title="Clear" style="display:none">✕</button>
+                    <button class="icon-btn" id="homeClear" title="Clear search" style="display:none"
+                        aria-label="Clear">✕</button>
                     <div class="divider-v"></div>
-                    <button class="icon-btn" title="Search" onclick="triggerSearch()">→</button>
+                    <button class="icon-btn" title="Search" aria-label="Search" onclick="triggerSearch()">→</button>
                 </div>
             </div>
-            <div class="suggestions-box" id="homeSuggestions"></div>
+            <div class="suggestions-box" id="homeSuggestions" role="listbox"></div>
         </div>
 
         <div class="home-buttons">
-            <button class="home-btn" onclick="loadSampleData()"> Load Sample Data</button>
+            <button class="home-btn" onclick="loadSampleData()" id="btnLoadSample">📚 Load Sample Data</button>
+            <button class="home-btn" onclick="document.getElementById('fileInput').click()" id="btnUpload">
+                ⬆ Upload Files
+            </button>
+            <!-- Hidden file input shared by all upload triggers -->
+            <input type="file" id="fileInput" multiple accept=".txt,.md" style="display:none"
+                onchange="handleFileInput(this.files)">
         </div>
 
-        <div style="margin-top: 32px; font-size: 13px; color: var(--text-dim); text-align: center; max-width: 420px;">
-            Drop a <span style="color:var(--text-muted)">.txt</span> or <span style="color:var(--text-muted)">.md</span>
-            file anywhere ·
-            TF-IDF scoring · Fuzzy typo tolerance
+        <div class="home-hint">
+            Drop a <span class="hint-code">.txt</span> or <span class="hint-code">.md</span> file anywhere
+            &nbsp;·&nbsp; TF-IDF scoring &nbsp;·&nbsp; Fuzzy typo-tolerance
+            &nbsp;·&nbsp; <kbd class="kbd">Ctrl+K</kbd> to focus
         </div>
     </div>
 
-    <!-- ═══════════════ RESULTS PAGE ═══════════════ -->
+    <!-- ══════════════════════════════════════════════════════════════
+         RESULTS PAGE (post-search state)
+    ════════════════════════════════════════════════════════════════ -->
     <div id="resultsPage">
 
-        <!-- STICKY HEADER -->
+        <!-- STICKY HEADER ─────────────────────────────────────────── -->
         <div class="results-header">
-            <a class="results-logo" onclick="goHome()" style="cursor:pointer; text-decoration:none;">
-                <span class="logo-n">N</span><span class="logo-e">e</span><span class="logo-x">x</span>
+            <!-- Clicking the logo goes back to home -->
+            <a class="results-logo" onclick="goHome()" role="button" aria-label="Go to home page">
+                <span class="logo-d">D</span><span class="logo-a">a</span><span class="logo-v">v</span>
             </a>
 
             <div class="search-bar-wrap" id="resultsBarWrap">
                 <div class="search-bar no-suggest" id="resultsBar">
-                    <span class="search-icon-left">🔍</span>
+                    <span class="material-icons search-icon-left" style="font-size:18px;color:var(--text-muted)">search</span>
                     <input class="search-input" id="resultsInput" placeholder="Search your documents…"
-                        autocomplete="off">
+                        autocomplete="off" aria-label="Refine your search">
                     <div class="search-bar-right">
-                        <button class="icon-btn" id="resultsClear" title="Clear" style="display:none">✕</button>
+                        <button class="icon-btn" id="resultsClear" title="Clear" style="display:none"
+                            aria-label="Clear">✕</button>
                         <div class="divider-v"></div>
-                        <button class="icon-btn" title="Search" onclick="triggerSearch()">→</button>
+                        <button class="icon-btn" title="Search" onclick="triggerSearch()" aria-label="Search">→</button>
                     </div>
                 </div>
-                <div class="suggestions-box" id="resultsSuggestions"></div>
+                <div class="suggestions-box" id="resultsSuggestions" role="listbox"></div>
             </div>
 
             <div class="header-icons">
-                <button class="icon-btn" title="Upload files"
-                    onclick="document.getElementById('fileInput').click()">+</button>
-                <input type="file" id="fileInput" multiple accept=".txt,.md" style="display:none"
-                    onchange="handleFileInput(this.files)">
+                <button class="icon-btn header-upload-btn" title="Upload files"
+                    onclick="document.getElementById('fileInput').click()" aria-label="Upload files">⬆</button>
+                <button class="icon-btn" title="Reset session" onclick="resetSession()" aria-label="Reset all indexed documents"
+                    style="color:var(--red)">⊗</button>
             </div>
         </div>
 
-        <!-- TABS -->
-        <div class="results-tabs">
-            <div class="tab active"> Documents</div>
-            <div class="tab"> Vocabulary</div>
-            <div class="tab"> Index</div>
+        <!-- TABS ──────────────────────────────────────────────────── -->
+        <div class="results-tabs" role="tablist">
+            <div class="tab active" role="tab">Documents</div>
+            <div class="tab" role="tab">Vocabulary</div>
+            <div class="tab" role="tab">Index</div>
         </div>
 
-        <!-- BODY -->
+        <!-- BODY ──────────────────────────────────────────────────── -->
         <div class="results-body">
 
-            <!-- MAIN RESULTS -->
+            <!-- MAIN RESULTS ──────────────────────────────────────── -->
             <div class="results-main">
                 <div class="results-meta" id="resultsMeta"></div>
-                <div id="correctionBanner" style="display:none" class="correction-chip">
+
+                <!-- Fuzzy correction banner -->
+                <div id="correctionBanner" style="display:none" class="correction-chip" role="alert">
                     ⚠ Showing results for: <strong id="correctionWord"></strong>&nbsp;
                     <span class="apply-fix" id="applyFix">Search instead for original →</span>
                 </div>
-                <div id="resultsList"></div>
+
+                <div id="resultsList" role="list"></div>
             </div>
 
-            <!-- SIDEBAR -->
+            <!-- SIDEBAR ───────────────────────────────────────────── -->
             <div class="results-sidebar">
 
-                <!-- STATS -->
+                <!-- STATS GRID -->
                 <div class="stats-grid">
                     <div class="stat-box">
                         <div class="s-val" id="sDocCount">0</div>
@@ -126,7 +161,18 @@
                     </div>
                 </div>
 
-
+                <!-- UPLOAD ZONE (sideDropZone — required by uploader.js) -->
+                <div class="sidebar-section">
+                    <div class="sidebar-title">Add Documents</div>
+                    <div class="upload-zone" id="sideDropZone" role="button"
+                        aria-label="Click or drag files here to upload">
+                        <div class="upload-zone-icon">📂</div>
+                        <div>Click or drop <span style="color:var(--accent)">.txt</span> /
+                            <span style="color:var(--accent)">.md</span> files here</div>
+                    </div>
+                    <!-- Indexed document chips (docChips — required by renderer.js) -->
+                    <div id="docChips"></div>
+                </div>
 
                 <!-- QUERY HISTORY -->
                 <div class="sidebar-section">
@@ -134,42 +180,63 @@
                     <div id="historyList"></div>
                 </div>
 
-                <!-- INDEX VIEWER -->
+                <!-- LIVE INDEX VIEWER -->
                 <div class="sidebar-section">
                     <div class="index-panel">
                         <div class="index-panel-header">
-                            <span> Live Index</span>
+                            <span>Live Index</span>
                             <span id="indexTermCount" style="color:var(--text-dim)">0 terms</span>
                         </div>
                         <div class="index-panel-body" id="indexBody"></div>
                     </div>
                 </div>
 
-                <!-- DOWNLOAD -->
-                <button class="download-btn" onclick="downloadReport()">⬇ Download Search Report</button>
+                <!-- ACTIONS -->
+                <div class="sidebar-actions">
+                    <button class="download-btn" onclick="downloadReport()">⬇ Download Search Report</button>
+                    <button class="reset-btn" onclick="resetSession()">⊗ Reset Session</button>
+                </div>
 
             </div>
         </div>
     </div>
 
-    <!-- ═══════════════ DOCUMENT VIEWER MODAL ═══════════════ -->
-    <div class="doc-viewer-overlay" id="docViewerOverlay" onclick="closeViewer(event)">
+    <!-- ══════════════════════════════════════════════════════════════
+         DOCUMENT VIEWER MODAL
+         Full-document view with line numbers and match navigation.
+    ════════════════════════════════════════════════════════════════ -->
+    <div class="doc-viewer-overlay" id="docViewerOverlay" onclick="closeViewer(event)" role="dialog"
+        aria-modal="true" aria-labelledby="viewerTitle">
         <div class="doc-viewer" onclick="event.stopPropagation()">
             <div class="doc-viewer-header">
                 <div class="doc-viewer-title" id="viewerTitle">document.txt</div>
                 <div class="viewer-match-nav">
                     <span id="viewerMatchInfo"
-                        style="font-size:12px; font-family:var(--mono); color:var(--text-muted)"></span>
-                    <button class="match-nav-btn" id="viewerPrev" onclick="navigateViewerMatch(-1)">↑</button>
-                    <button class="match-nav-btn" id="viewerNext" onclick="navigateViewerMatch(1)">↓</button>
+                        style="font-size:12px;font-family:var(--mono);color:var(--text-muted)"></span>
+                    <button class="match-nav-btn" id="viewerPrev" onclick="navigateViewerMatch(-1)"
+                        aria-label="Previous match">↑</button>
+                    <button class="match-nav-btn" id="viewerNext" onclick="navigateViewerMatch(1)"
+                        aria-label="Next match">↓</button>
                 </div>
-                <button class="icon-btn" onclick="closeViewer()" style="margin-left:8px;">✕</button>
+                <button class="icon-btn" onclick="closeViewer()" aria-label="Close viewer"
+                    style="margin-left:8px">✕</button>
             </div>
             <div class="doc-viewer-body" id="viewerBody"></div>
         </div>
     </div>
 
-    <script src="src/engine/engine.js"></script>
+    <!-- ══════════════════════════════════════════════════════════════
+         SCRIPTS — loaded in strict dependency order:
+         Each file depends only on globals defined by files above it.
+    ════════════════════════════════════════════════════════════════ -->
+    <script src="src/state/store.js"></script>
+    <script src="src/utils/preprocessor.js"></script>
+    <script src="src/utils/fuzzy.js"></script>
+    <script src="src/engine/indexer.js"></script>
+    <script src="src/engine/search.js"></script>
+    <script src="src/ui/renderer.js"></script>
+    <script src="src/ui/uploader.js"></script>
+    <script src="src/main.js"></script>
 
 </body>
 

@@ -1,0 +1,35 @@
+System Design: Principles, Patterns, and Trade-offs
+
+System design is the process of defining the architecture, components, modules, interfaces, and data flow of a system to satisfy specified functional and non-functional requirements. Scalability, reliability, maintainability, and cost are the primary non-functional constraints that shape architectural decisions.
+
+SCALABILITY PATTERNS
+
+Horizontal scaling, also called scaling out, adds more machines to distribute load. Vertical scaling, or scaling up, adds more CPU, RAM, or storage to an existing machine. Horizontal scaling is generally preferred for web services because it provides better fault tolerance — if one server fails, others continue serving requests. Vertical scaling has an upper bound imposed by hardware limits.
+
+A load balancer distributes incoming network traffic across a pool of servers. Round-robin distributes requests sequentially. Least-connections sends each new request to the server with the fewest active connections. Consistent hashing assigns requests to servers based on a hash of the request key, minimizing remapping when servers are added or removed.
+
+CACHING
+
+Caching stores frequently accessed data in fast storage to reduce latency and database load. An in-memory cache like Redis stores data in RAM, giving sub-millisecond read times. Cache invalidation is one of the hardest problems in computer science — deciding when cached data is stale and must be refreshed.
+
+Cache eviction policies determine which entries to remove when the cache is full. LRU (Least Recently Used) evicts the entry that was accessed least recently. LFU (Least Frequently Used) evicts the entry accessed fewest times. Write-through caches update both cache and database on every write, ensuring consistency. Write-back caches update the cache first and database lazily, improving write performance at the cost of potential data loss.
+
+A CDN (Content Delivery Network) caches static assets like images, stylesheets, and JavaScript files at edge servers geographically close to users. This reduces latency by serving content from a nearby server rather than a distant origin server.
+
+DATABASE DESIGN
+
+Database sharding horizontally partitions data across multiple database servers called shards. Each shard holds a subset of the data, identified by a shard key. Range-based sharding assigns rows by key ranges. Hash-based sharding uses a hash function to determine the shard. Sharding increases throughput but complicates cross-shard queries and transactions.
+
+Database replication maintains copies of data across multiple servers. Primary-replica replication sends all writes to a primary server, which replicates changes to replicas. Replicas serve read traffic, improving read throughput. Multi-primary replication allows writes on any node but requires conflict resolution.
+
+SQL databases provide ACID guarantees: Atomicity, Consistency, Isolation, Durability. NoSQL databases trade some ACID properties for horizontal scalability and flexible schema. The CAP theorem states that a distributed system can guarantee at most two of three properties: Consistency, Availability, and Partition Tolerance.
+
+MICROSERVICES AND MESSAGING
+
+Microservices architecture decomposes an application into small, independently deployable services that communicate over APIs. Each service owns its data and can be developed, deployed, and scaled independently. Service discovery allows services to locate each other dynamically without hardcoded addresses.
+
+Message queues like Kafka and RabbitMQ decouple services by enabling asynchronous communication. A producer publishes messages to a queue; consumers read messages at their own pace. This smooths out traffic spikes and improves fault isolation — if a consumer fails, messages remain in the queue until it recovers.
+
+Circuit breakers protect services from cascading failures. When error rates exceed a threshold, the circuit opens and stops sending requests to the failing service, returning an immediate error instead. After a cooldown period, it enters a half-open state to test recovery.
+
+API gateways serve as the single entry point for client requests, handling authentication, rate limiting, request routing, and response aggregation. Rate limiting protects APIs from abuse by capping the number of requests a client can make within a time window using algorithms like token bucket or sliding window.

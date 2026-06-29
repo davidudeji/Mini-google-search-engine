@@ -1,0 +1,35 @@
+JavaScript Fundamentals for Software Engineers
+
+JavaScript is a prototype-based, multi-paradigm, single-threaded, dynamic programming language that supports object-oriented, imperative, and declarative programming styles. It was created by Brendan Eich in 1995 and has evolved into one of the most widely used programming languages in the world.
+
+CLOSURES AND SCOPE
+
+A closure is one of the most powerful and frequently misunderstood features of JavaScript. A closure gives an inner function access to the outer function's scope even after the outer function has returned. Closures are created every time a function is created at function creation time. They capture the variable environment of their surrounding scope, not the values themselves.
+
+Understanding closures is essential for implementing module patterns, factory functions, memoization, and event handlers. The closure mechanism allows JavaScript developers to create private variables that cannot be accessed from outside the function scope.
+
+THE EVENT LOOP AND ASYNCHRONOUS PROGRAMMING
+
+JavaScript is single-threaded, meaning it can only execute one piece of code at a time. The event loop is the mechanism that enables asynchronous programming without multithreading. The call stack executes synchronous code while the event queue holds callbacks waiting to be processed. Once the call stack is empty, the event loop pulls the next callback from the queue.
+
+Promises represent eventual completion or failure of an asynchronous operation. The async and await keywords provide syntactic sugar over promises, making asynchronous code read like synchronous code. The fetch API uses promises to handle HTTP requests. Promise.all runs multiple promises in parallel and resolves when all of them resolve. Promise.race resolves or rejects as soon as the first promise settles.
+
+PROTOTYPE CHAIN AND INHERITANCE
+
+Every JavaScript object has an internal prototype property that points to another object. This chain of prototypes is called the prototype chain. When you access a property on an object, JavaScript first looks at the object itself, then traverses up the prototype chain until it finds the property or reaches the end of the chain.
+
+ES6 introduced the class syntax as syntactic sugar over prototype-based inheritance. The extends keyword allows one class to inherit from another. The super keyword calls the parent class constructor or methods. Despite the class syntax, JavaScript inheritance is still prototype-based under the hood.
+
+MEMORY MANAGEMENT AND GARBAGE COLLECTION
+
+JavaScript automatically manages memory allocation and deallocation through a process called garbage collection. The most common algorithm is mark-and-sweep, which identifies objects that are no longer reachable from the root references and frees their memory. Memory leaks occur when references to unused objects are unintentionally retained, preventing garbage collection.
+
+WeakMap and WeakSet hold weak references to objects, allowing garbage collection when no strong references remain. This makes them useful for caching and metadata storage without preventing garbage collection of the associated objects.
+
+ADVANCED FUNCTIONS
+
+Functions in JavaScript are first-class citizens. They can be assigned to variables, passed as arguments to other functions, returned from functions, and stored in data structures. Higher-order functions like map, filter, and reduce take functions as arguments or return them.
+
+Generator functions can pause and resume their execution using the yield keyword. They implement the iterator protocol, making them useful for lazy evaluation and cooperative multitasking. The Symbol.iterator protocol allows custom objects to be iterable in for-of loops and spread operations.
+
+The V8 engine, developed by Google, compiles JavaScript to native machine code using just-in-time compilation. It applies optimizations such as hidden classes and inline caching to make frequently executed code run faster.

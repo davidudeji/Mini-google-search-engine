@@ -1,0 +1,39 @@
+Machine Learning Fundamentals: Concepts, Algorithms, and Applications
+
+Machine learning is a subset of artificial intelligence that enables systems to learn from data and improve their performance on tasks without being explicitly programmed. Instead of following handcrafted rules, machine learning models identify patterns in training data and generalize those patterns to make predictions on new, unseen data.
+
+SUPERVISED LEARNING
+
+Supervised learning trains a model on labeled examples — pairs of input features and known output labels. The goal is to learn a mapping function from inputs to outputs that generalizes beyond the training set. Classification predicts a discrete category label (spam or not spam). Regression predicts a continuous numerical value (house price prediction).
+
+Linear regression models the relationship between input features and a continuous target as a weighted sum. The weights are learned by minimizing a loss function, typically mean squared error, using gradient descent. Logistic regression applies a sigmoid activation function to produce probability outputs between zero and one for binary classification.
+
+NEURAL NETWORKS AND DEEP LEARNING
+
+A neural network consists of layers of interconnected artificial neurons, each computing a weighted sum of its inputs followed by a non-linear activation function. Deep learning refers to neural networks with many hidden layers that can learn hierarchical representations of data.
+
+Backpropagation is the algorithm used to train neural networks. It computes the gradient of the loss function with respect to each weight using the chain rule of calculus, then updates weights in the direction that reduces the loss. The learning rate hyperparameter controls the step size of each update.
+
+Gradient descent updates all weights using the gradient computed on the entire dataset. Stochastic gradient descent updates weights using the gradient from a single random example, which is noisy but fast. Mini-batch gradient descent uses a small random subset called a batch, balancing convergence stability and computation speed.
+
+Overfitting occurs when a model memorizes the training data and fails to generalize to new examples. Techniques to prevent overfitting include dropout, which randomly deactivates neurons during training, L2 regularization which penalizes large weight values, and data augmentation which artificially expands the training set.
+
+CONVOLUTIONAL AND RECURRENT NETWORKS
+
+Convolutional neural networks are specialized architectures for processing grid-structured data like images. Convolutional layers apply learned filters across the input, detecting local features like edges and textures. Pooling layers reduce spatial dimensions. Deep convolutional networks like ResNet and VGG power modern computer vision.
+
+Recurrent neural networks process sequential data by maintaining a hidden state that evolves as the network reads each element in the sequence. Long short-term memory cells, or LSTMs, use gating mechanisms to selectively retain information over long sequences, mitigating the vanishing gradient problem.
+
+Transformer architectures use self-attention mechanisms to weigh the relevance of each element in a sequence to every other element. Transformers trained on massive text corpora, such as GPT and BERT, demonstrate remarkable natural language understanding and generation capabilities.
+
+UNSUPERVISED LEARNING AND CLUSTERING
+
+Unsupervised learning discovers patterns in data without labeled examples. K-means clustering partitions data into K groups by iteratively assigning each point to the nearest centroid and recomputing centroids until convergence. Principal component analysis reduces the dimensionality of data by projecting it onto the directions of maximum variance.
+
+Reinforcement learning trains agents to make decisions in an environment by rewarding desirable actions and penalizing undesirable ones. The agent learns a policy that maximizes cumulative reward over time. Deep Q-learning combines neural networks with reinforcement learning to handle high-dimensional state spaces.
+
+EVALUATION METRICS
+
+Model evaluation uses metrics appropriate to the task. Accuracy measures the fraction of correct predictions. Precision is the fraction of positive predictions that are correct. Recall is the fraction of actual positives that were correctly identified. The F1 score is the harmonic mean of precision and recall. Mean absolute error and root mean squared error measure regression performance.
+
+Cross-validation splits the dataset into multiple folds, training and evaluating the model on different subsets to get a more reliable estimate of generalization performance than a single train-test split.

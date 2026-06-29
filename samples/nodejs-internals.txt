@@ -1,0 +1,41 @@
+Node.js Internals: The Runtime, Event Loop, and I/O Model
+
+Node.js is a cross-platform, open-source JavaScript runtime environment built on Chrome's V8 JavaScript engine. It executes JavaScript code outside the browser, enabling server-side scripting, command-line tools, and real-time applications. Node.js was created by Ryan Dahl in 2009 to solve the C10K problem — serving ten thousand concurrent connections without spawning a thread per connection.
+
+THE EVENT LOOP
+
+The event loop is the heart of Node.js's non-blocking I/O model. Unlike traditional server frameworks that create a new operating system thread for each connection, Node.js uses a single-threaded event loop that handles all I/O operations asynchronously.
+
+The event loop operates in phases, each with a FIFO queue of callbacks to execute:
+1. Timers: executes callbacks scheduled by setTimeout and setInterval
+2. Pending callbacks: executes I/O callbacks deferred from the previous loop iteration
+3. Idle, Prepare: internal use only
+4. Poll: retrieves new I/O events and executes their callbacks
+5. Check: executes setImmediate callbacks
+6. Close callbacks: executes callbacks for closed connections
+
+LIBUV AND THE THREAD POOL
+
+Libuv is the multi-platform C library that provides Node.js with its asynchronous I/O capabilities. It abstracts platform differences between Linux (epoll), macOS (kqueue), and Windows (IOCP) into a unified API. Libuv maintains a thread pool that defaults to four threads, used for file system operations, DNS resolution, and user-defined asynchronous work via worker_threads.
+
+File system reads are not truly asynchronous at the OS level on all platforms. Libuv offloads them to thread pool workers, which perform the blocking read and then post a completion callback to the event loop. This is why file I/O in Node.js is non-blocking from the application's perspective even though the underlying OS call is synchronous.
+
+STREAMS AND BUFFERS
+
+Streams in Node.js are objects that let you read or write data in chunks rather than loading the entire dataset into memory. The four fundamental stream types are Readable, Writable, Duplex (both readable and writable), and Transform (a duplex that modifies data as it passes through).
+
+Buffers represent fixed-length sequences of bytes in memory. They are used to handle binary data — such as image files, network packets, or encrypted payloads — before converting them to strings. Buffer.alloc creates a zero-filled buffer of a given size. Buffer.from converts strings, arrays, or ArrayBuffers into Node.js Buffers.
+
+Backpressure occurs when a readable stream produces data faster than a writable stream can consume it. The pipe method handles backpressure automatically by pausing the readable when the writable's internal buffer is full and resuming when the buffer drains.
+
+MODULES AND THE COMMONJS SYSTEM
+
+Node.js implements the CommonJS module specification. The require function synchronously loads and evaluates a module, returning its exports object. Modules are cached after the first load — subsequent require calls return the same cached exports object without re-evaluating the file. This caching behaviour makes require calls cheap after the first and enables module-level singletons.
+
+ES modules (import and export syntax) are now fully supported in Node.js with the .mjs extension or the "type": "module" package.json field. ES modules are loaded asynchronously and support static analysis, enabling tree-shaking in bundlers.
+
+WORKER THREADS AND CLUSTERING
+
+Worker threads allow CPU-intensive JavaScript to run in parallel on separate threads without blocking the event loop. They share memory through SharedArrayBuffer and communicate via message passing. Workers are suitable for tasks like image processing, cryptography, or data compression.
+
+The cluster module forks multiple Node.js processes that share the same server port. The primary process distributes incoming connections to worker processes, enabling multi-core utilization. PM2 is a popular process manager that uses clustering internally and provides automatic restarts, logging, and monitoring.

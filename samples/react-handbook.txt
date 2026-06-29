@@ -1,0 +1,37 @@
+React Handbook: Components, Hooks, and Architecture
+
+React is a free and open-source front-end JavaScript library for building user interfaces based on components. It was created by Jordan Walke at Meta and first deployed on Facebook's news feed in 2011. React's core philosophy is that UI is a function of state — the same input state always produces the same rendered output.
+
+COMPONENTS AND PROPS
+
+Components are the fundamental building blocks of React applications. A component is a self-contained module that receives data through props and renders a piece of the user interface. Function components are plain JavaScript functions that accept props and return JSX. Class components extend React.Component and use the render method.
+
+Props are read-only. A component cannot modify its own props. Data flows downward through the component tree in what is called a unidirectional data flow. This makes React applications predictable — you always know where data comes from and where it goes.
+
+STATE MANAGEMENT WITH HOOKS
+
+State in React components is what makes them interactive. When state changes, React re-renders the component and its descendants. The useState hook is the primary API for managing local component state in function components. It returns the current state value and a setter function.
+
+The useEffect hook synchronizes a component with external systems such as APIs, browser APIs, or third-party libraries. It replaces lifecycle methods like componentDidMount, componentDidUpdate, and componentWillUnmount from class components. The dependency array controls when the effect runs — an empty array means run once after mount, specific values mean run when those values change.
+
+useCallback memoizes a function definition between re-renders. useMemo memoizes a computed value. Both accept a dependency array and only recompute when dependencies change. These hooks prevent unnecessary re-renders in child components that receive the memoized values as props.
+
+Custom hooks are JavaScript functions whose names start with "use" and that call other hooks. They let you extract stateful logic from components into reusable functions that can be shared across the codebase.
+
+THE VIRTUAL DOM AND RECONCILIATION
+
+React maintains a virtual DOM — a lightweight JavaScript representation of the actual DOM tree. When state or props change, React creates a new virtual DOM tree and compares it with the previous one through a process called reconciliation. The diffing algorithm determines the minimal set of changes needed to update the real DOM.
+
+React Fiber is the reimplementation of the reconciliation engine introduced in React 16. It breaks rendering work into units called fibers, allowing React to pause, abort, or prioritize rendering work. This enables concurrent features like startTransition, which marks updates as non-urgent so the UI stays responsive during heavy computation.
+
+CONTEXT AND LIFTING STATE
+
+The Context API provides a way to pass data through the component tree without manually threading props through every intermediate level. A context provider wraps part of the component tree and supplies a value, which any descendant consumer can read using useContext.
+
+When multiple components need to share the same state, you lift the state up to their nearest common ancestor. The ancestor manages the state and passes it down to children via props. This pattern keeps the component tree predictable and avoids synchronization bugs.
+
+ERROR BOUNDARIES
+
+Error boundaries are class components that catch JavaScript errors anywhere in their child component tree, log those errors, and display a fallback UI instead of crashing the entire application. They implement componentDidCatch and getDerivedStateFromError lifecycle methods.
+
+Server components, introduced in React 18, allow components to be rendered exclusively on the server. They have access to backend resources directly and produce no client-side JavaScript bundle, dramatically reducing the amount of code the browser needs to download and parse.

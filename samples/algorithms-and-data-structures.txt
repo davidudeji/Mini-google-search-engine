@@ -1,0 +1,41 @@
+Algorithms and Data Structures: A Comprehensive Reference
+
+COMPLEXITY ANALYSIS
+
+Big-O notation describes how an algorithm's time or space requirements grow relative to input size. O(1) is constant time — independent of input. O(log n) is logarithmic, typical of binary search on sorted data. O(n) is linear, proportional to input size. O(n log n) is the lower bound for comparison-based sorting. O(n²) is quadratic, common in naive nested loop solutions. O(2^n) is exponential, typical of brute-force combinatorial search.
+
+Space complexity measures auxiliary memory usage beyond the input itself. An algorithm is considered in-place if it uses O(1) extra space, making it memory-efficient for large datasets.
+
+SORTING ALGORITHMS
+
+Merge sort divides the input array in half recursively, sorts each half, then merges the sorted halves. Its time complexity is O(n log n) in all cases, making it a stable and predictable sorting algorithm. Its space complexity is O(n) because it requires an auxiliary array for merging.
+
+QuickSort selects a pivot element and partitions the array into elements less than the pivot and elements greater. It recursively sorts each partition. Average time complexity is O(n log n), but the worst case is O(n²) when the pivot is consistently the smallest or largest element. Randomized pivot selection mitigates this.
+
+Heapsort builds a max-heap data structure from the array, then repeatedly extracts the maximum element. It achieves O(n log n) time complexity and O(1) space, but its cache performance is poor compared to QuickSort because of non-sequential memory access patterns.
+
+GRAPH ALGORITHMS
+
+Breadth-first search explores a graph level by level, using a queue. It finds the shortest path in an unweighted graph in O(V + E) time where V is vertices and E is edges. Depth-first search uses a stack and explores as far as possible along each branch before backtracking.
+
+Dijkstra's algorithm finds shortest paths from a single source in a weighted graph with non-negative edge weights. Using a min-heap priority queue, it runs in O((V + E) log V). The algorithm greedily processes the vertex with the smallest known distance at each step.
+
+Bellman-Ford handles negative edge weights and detects negative cycles. It runs in O(V × E) time by relaxing all edges V-1 times. Floyd-Warshall computes all-pairs shortest paths in O(V³) using dynamic programming.
+
+DYNAMIC PROGRAMMING
+
+Dynamic programming solves optimization problems by breaking them into overlapping subproblems, solving each subproblem once, and storing the results in a table to avoid redundant computation. This is called memoization when done top-down and tabulation when done bottom-up.
+
+The Fibonacci sequence can be computed in O(n) time and O(1) space using dynamic programming instead of the naive O(2^n) recursive approach. The longest common subsequence problem runs in O(m × n) time using a 2D memoization table where m and n are the lengths of the two sequences.
+
+TREES AND BALANCED SEARCH TREES
+
+A binary search tree maintains the invariant that for any node, all keys in the left subtree are smaller and all keys in the right subtree are larger. Search, insertion, and deletion are O(h) where h is the tree height. For a balanced tree, h = O(log n), giving O(log n) operations.
+
+AVL trees maintain balance by tracking the height difference between subtrees and performing rotations when the balance factor exceeds one. Red-black trees use a coloring invariant and up to two rotations per insertion or deletion to maintain O(log n) height. B-trees generalize binary search trees by allowing nodes to have more than two children, optimizing for disk-block reads in database systems.
+
+HASH TABLES
+
+Hash tables map keys to values using a hash function that converts keys to array indices. Average-case O(1) insertion, deletion, and lookup. Collisions — when two keys hash to the same index — are resolved by chaining (linked lists at each index) or open addressing (probing adjacent indices).
+
+A good hash function distributes keys uniformly across the table to minimize collisions. Load factor (number of entries divided by table capacity) determines when to resize. Resizing doubles the table size and rehashes all existing entries at O(n) cost, amortized to O(1) per insertion.
