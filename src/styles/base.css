@@ -29,6 +29,18 @@
       --mono: 'JetBrains Mono', monospace;
   }
 
+
+  .material-symbols-outlined {
+      font-variation-settings:
+          'FILL' 0,
+          'wght' 400,
+          'GRAD' 0,
+          'opsz' 24
+  }
+
+
+  @import url('https://fonts.googleapis.com/icon?family=Material+Icons');
+
   body {
       background: var(--bg);
       color: var(--text);
