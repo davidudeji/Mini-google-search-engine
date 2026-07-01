@@ -14,14 +14,17 @@
 //  │  3. If we ever replace the UI framework (e.g., move to React),    │
 //  │     only this file changes — the engine is untouched.            │
 //  │                                                                    │
-//  │  PERFORMANCE NOTE — innerHTML vs. DOM API:                        │
-//  │  We use innerHTML for result cards because building 10–20 cards   │
-//  │  via DOM API (createElement, appendChild) would require ~50–100   │
-//  │  individual DOM calls. Constructing a single HTML string and      │
-//  │  setting innerHTML once is faster for batch updates because the   │
-//  │  browser only needs to parse and paint the DOM tree once.        │
-//  │  The trade-off: HTML strings are harder to unit-test. Acceptable  │
-//  │  for a single-developer portfolio project.                        │
+//  │  PERFORMANCE NOTE — DocumentFragment (spec §5):                   │
+//  │  Result cards are built into a DocumentFragment and inserted      │
+//  │  with a single replaceChildren() call. This triggers exactly ONE  │
+//  │  layout reflow instead of N reflows for N cards. The browser      │
+//  │  batches the entire paint into one repaint cycle.                 │
+//  │                                                                    │
+//  │  EVENT DELEGATION NOTE:                                           │
+//  │  Result cards use data-* attributes (data-docid, data-query,      │
+//  │  data-dir, data-total, data-suggestion, data-query) instead of    │
+//  │  inline onclick handlers. The single delegated listener in        │
+//  │  main.js reads these attributes to dispatch actions.             │
 //  └────────────────────────────────────────────────────────────────────┘
 //
 //  ┌─ INTERVIEW DEFENCE ────────────────────────────────────────────────┐
@@ -40,13 +43,11 @@
 //  │  A: Implement windowed rendering — only render cards for the       │
 //  │     ~10 items currently visible in the viewport. Use an           │
 //  │     IntersectionObserver or scroll listener to load the next batch │
-//  │     of cards as the user scrolls. Libraries like react-window do  │
-//  │     this. For our corpus constraint (< 25MB, typical < 30 docs),  │
+//  │     as the user scrolls. For our corpus (<25MB, <30 docs),        │
 //  │     full rendering is fine.                                        │
 //  └─────────────────────────────────────────────────────────────────────┘
 
 // ── MATCH NAVIGATION STATE ────────────────────────────────────────────
-// These are tightly coupled to rendered cards, so they live here.
 const matchCursors = {}; // { docId: currentMatchIndex } for inline card nav
 
 // Document viewer state
@@ -56,8 +57,9 @@ let viewerMatchIdx = 0;  // which match line we are currently at
 // ── CORE RENDER FUNCTIONS ─────────────────────────────────────────────
 
 /**
- * renderResults(query, searchResult) — Populates the results page
- * with ranked result cards. Called by goToResults() in main.js.
+ * renderResults(query, searchResult) — Populates the results page with
+ * ranked result cards, using DocumentFragment for a single-repaint DOM
+ * update (spec §5).
  *
  * @param {string} query        — the raw user query (for display)
  * @param {Object} searchResult — { results, time, correction } from search()
@@ -68,10 +70,10 @@ function renderResults(query, { results, time, correction }) {
   AppState.lastResults = results;
 
   // ── Update stats sidebar ──────────────────────────────────────────
-  document.getElementById('sQueryTime').textContent    = time + 'ms';
-  document.getElementById('sResultCount').textContent  = results.length;
+  document.getElementById('sQueryTime').textContent   = time + 'ms';
+  document.getElementById('sResultCount').textContent = results.length;
 
-  // ── Meta row ─────────────────────────────────────────────────────
+  // ── Meta row — Google style: "About N results (X ms)" ────────────
   document.getElementById('resultsMeta').textContent =
     `About ${results.length} result${results.length !== 1 ? 's' : ''} (${time} ms)`;
 
@@ -84,63 +86,100 @@ function renderResults(query, { results, time, correction }) {
     banner.style.display = 'none';
   }
 
+  const listEl = document.getElementById('resultsList');
+
   // ── No results state ─────────────────────────────────────────────
   if (results.length === 0) {
-    document.getElementById('resultsList').innerHTML = `
+    listEl.innerHTML = `
       <div class="no-results">
-        <div style="font-size:48px;margin-bottom:12px">🔍</div>
-        <h2>No results for "<strong>${escHtml(query)}</strong>"</h2>
-        <p style="margin-top:6px;font-size:14px;color:var(--text-muted)">
-          Try a different keyword, check spelling, or upload more documents.
+        <p style="font-size:16px;color:#202124;margin-bottom:8px">
+          Your search — <strong>${escHtml(query)}</strong> — did not match any documents.
+        </p>
+        <p style="font-size:14px;color:#70757a;line-height:1.6">
+          Suggestions:<br>
+          • Make sure all words are spelled correctly.<br>
+          • Try different keywords.<br>
+          • Upload more documents and try again.
         </p>
       </div>`;
     return;
   }
 
-  // ── Result cards ─────────────────────────────────────────────────
-  document.getElementById('resultsList').innerHTML = results.map((r, i) => {
+  // ── Build result cards into a DocumentFragment (spec §5) ─────────
+  //  A DocumentFragment is an in-memory, lightweight DOM container.
+  //  Elements appended to it are NOT part of the live document, so no
+  //  reflows are triggered. A single replaceChildren() call inserts the
+  //  entire batch into the live DOM in one repaint.
+  const fragment = document.createDocumentFragment();
+
+  results.forEach((r, i) => {
     const matchPositions = findMatches(r.doc.text, r.terms);
     const matchCount     = matchPositions.length;
     const fileName       = r.doc.name.replace(/\.[^.]+$/, ''); // strip extension
 
-    return `
-    <div class="result-card" style="animation-delay:${i * 0.05}s">
+    // Create the card element — safer than bulk innerHTML on the live list
+    const card = document.createElement('div');
+    card.className = 'result-card';
+    card.setAttribute('role', 'listitem');
+    card.style.animationDelay = `${i * 0.05}s`;
+
+    // Build card HTML — data-* attributes power event delegation in main.js
+    card.innerHTML = `
       <div class="result-url-row">
-        <div class="result-favicon">📄</div>
-        <span class="result-url">${escHtml(r.doc.name)}</span>
+        <div class="result-favicon" aria-hidden="true">📄</div>
+        <div>
+          <div class="result-site-name">${escHtml(fileName)}</div>
+          <span class="result-breadcrumb">${escHtml(r.doc.name)}</span>
+        </div>
       </div>
-      <div class="result-title" onclick="openDocViewer(${r.doc.id}, '${escHtml(query).replace(/'/g, "\\'")}')">
+
+      <a class="result-title"
+         data-docid="${r.doc.id}"
+         data-query="${escHtml(query)}"
+         role="button"
+         tabindex="0"
+         aria-label="View ${escHtml(fileName)}">
         ${escHtml(fileName)}
-      </div>
+      </a>
+
       <div class="result-badges">
         ${i === 0 ? '<span class="badge-sm badge-top">⭐ Top result</span>' : ''}
         ${r.isFuzzy
           ? '<span class="badge-sm badge-fuzzy">~ Fuzzy match</span>'
           : '<span class="badge-sm badge-exact">✓ Exact match</span>'}
       </div>
+
       <div class="result-score-row">
-        <div class="score-track">
+        <div class="score-track" aria-hidden="true">
           <div class="score-fill" style="width:${r.pct}%"></div>
         </div>
         <span class="score-pct">TF-IDF ${r.score.toFixed(4)} · ${r.pct}% relevance</span>
       </div>
+
       <div class="result-snippet">${buildSnippet(r.doc.text, r.terms)}</div>
+
       ${matchCount > 0 ? `
       <div class="match-navigator" data-docid="${r.doc.id}">
-        <span style="font-size:13px">📍</span>
-        <span class="match-count" id="mc-${r.doc.id}">1 of ${matchCount} matches</span>
-        <button class="match-nav-btn" onclick="navigateMatch(${r.doc.id},-1,${matchCount})"
-          id="mprev-${r.doc.id}" disabled>↑</button>
-        <button class="match-nav-btn" onclick="navigateMatch(${r.doc.id},1,${matchCount})"
-          id="mnext-${r.doc.id}" ${matchCount <= 1 ? 'disabled' : ''}>↓</button>
-        <span style="color:var(--text-dim);font-size:12px">·</span>
-        <span class="view-all-link"
-          onclick="openDocViewer(${r.doc.id},'${escHtml(query).replace(/'/g, "\\'")}')">
-          View all →
-        </span>
+        <span aria-hidden="true">📍</span>
+        <span class="match-count" id="mc-${r.doc.id}">1 of ${matchCount} match${matchCount !== 1 ? 'es' : ''}</span>
+        <button class="match-nav-btn"
+          data-docid="${r.doc.id}" data-dir="-1" data-total="${matchCount}"
+          id="mprev-${r.doc.id}" disabled aria-label="Previous match">↑</button>
+        <button class="match-nav-btn"
+          data-docid="${r.doc.id}" data-dir="1" data-total="${matchCount}"
+          id="mnext-${r.doc.id}" ${matchCount <= 1 ? 'disabled' : ''}
+          aria-label="Next match">↓</button>
+        <span aria-hidden="true" style="color:#dadce0">·</span>
+        <span class="view-all-link" data-docid="${r.doc.id}" role="button"
+          tabindex="0">View full document →</span>
       </div>` : ''}
-    </div>`;
-  }).join('');
+    `;
+
+    fragment.appendChild(card);
+  });
+
+  // Single DOM write — one repaint (spec §5)
+  listEl.replaceChildren(fragment);
 
   // Initialise per-card match cursors at position 0.
   results.forEach(r => { matchCursors[r.doc.id] = 0; });
@@ -149,12 +188,12 @@ function renderResults(query, { results, time, correction }) {
 /**
  * navigateMatch(docId, dir, total) — Increments/decrements the match
  * cursor for a specific result card and updates its counter display.
- * This is a UI-only function — no engine logic.
  */
 function navigateMatch(docId, dir, total) {
   matchCursors[docId] = Math.max(0, Math.min((matchCursors[docId] || 0) + dir, total - 1));
   const current = matchCursors[docId] + 1;
-  document.getElementById(`mc-${docId}`).textContent = `${current} of ${total} matches`;
+  document.getElementById(`mc-${docId}`).textContent =
+    `${current} of ${total} match${total !== 1 ? 'es' : ''}`;
   document.getElementById(`mprev-${docId}`).disabled = current === 1;
   document.getElementById(`mnext-${docId}`).disabled = current === total;
 }
@@ -165,15 +204,13 @@ function navigateMatch(docId, dir, total) {
  * openDocViewer(docId, query) — Opens the full-document modal with
  * syntax-highlighted matches and line-by-line navigation.
  *
- * ALGORITHM: To highlight matches within lines without corrupting
- * offsets, we apply substitutions in REVERSE ORDER within each line.
+ * ALGORITHM: Highlights are applied in REVERSE ORDER within each line.
  * (See interview defence at top of file for explanation.)
  */
 function openDocViewer(docId, query) {
   const doc    = AppState.documents.find(d => d.id === docId);
   if (!doc) return;
 
-  // Retrieve the match terms from the last search result for this doc.
   const result = AppState.lastResults.find(r => r.doc.id === docId);
   const terms  = result?.terms || [];
 
@@ -181,8 +218,6 @@ function openDocViewer(docId, query) {
   const allMatches = findMatches(doc.text, terms);
 
   // ── Map character-position matches → line indices ─────────────────
-  // We walk through the document character by character to know which
-  // line each match position falls on.
   let charCount    = 0;
   const lineMatchMap = {};
 
@@ -195,7 +230,6 @@ function openDocViewer(docId, query) {
         if (!lineMatchMap[lineIdx]) lineMatchMap[lineIdx] = [];
         lineMatchMap[lineIdx].push({
           ...m,
-          // Convert to line-local offsets for in-line string surgery.
           localStart: m.start - lineStart,
           localEnd:   m.end   - lineStart,
           matchIndex: matchIdx
@@ -203,11 +237,9 @@ function openDocViewer(docId, query) {
       }
     });
 
-    // +1 accounts for the '\n' character that .split() consumed.
-    charCount += line.length + 1;
+    charCount += line.length + 1; // +1 for the '\n' that .split() consumed
   });
 
-  // Collect all line indices that have at least one match.
   viewerMatches  = Object.keys(lineMatchMap).map(Number);
   viewerMatchIdx = 0;
 
@@ -221,15 +253,15 @@ function openDocViewer(docId, query) {
   document.getElementById('viewerPrev').disabled = true;
   document.getElementById('viewerNext').disabled = viewerMatches.length <= 1;
 
-  // ── Render line-by-line content ───────────────────────────────────
-  const body = document.getElementById('viewerBody');
-  body.innerHTML = lines.map((line, lineIdx) => {
+  // ── Render line-by-line into a DocumentFragment ───────────────────
+  const bodyFragment = document.createDocumentFragment();
+
+  lines.forEach((line, lineIdx) => {
     const matchesOnLine = lineMatchMap[lineIdx] || [];
     const hasMatch      = matchesOnLine.length > 0;
     const isFirstMatch  = viewerMatches[0] === lineIdx;
 
     // Apply highlights in REVERSE ORDER to preserve offset correctness.
-    // (Inserting HTML forward shifts all subsequent character positions.)
     const sortedReverse = [...matchesOnLine].sort((a, b) => b.localStart - a.localStart);
     let highlightedLine = line;
 
@@ -241,27 +273,28 @@ function openDocViewer(docId, query) {
       const wrapped = cls
         ? `<span class="${cls}">${escHtml(word)}</span>`
         : `<mark>${escHtml(word)}</mark>`;
-      // NOTE: before/after are raw; they will be escHtml'd in the final join.
-      // We store the raw string and escape only non-highlighted segments.
       highlightedLine = escHtml(before) + wrapped + escHtml(after);
     });
 
-    // If no matches on this line, escape the entire line for safety.
     if (matchesOnLine.length === 0) {
       highlightedLine = escHtml(line);
     }
 
-    return `<div class="doc-line ${hasMatch ? 'has-match' : ''} ${isFirstMatch ? 'active-match' : ''}"
-      id="vline-${lineIdx}">
+    const lineEl = document.createElement('div');
+    lineEl.className = `doc-line${hasMatch ? ' has-match' : ''}${isFirstMatch ? ' active-match' : ''}`;
+    lineEl.id = `vline-${lineIdx}`;
+    lineEl.innerHTML = `
       <span class="line-num">${lineIdx + 1}</span>
       <span class="line-content">${highlightedLine || '&nbsp;'}</span>
-    </div>`;
-  }).join('');
+    `;
+    bodyFragment.appendChild(lineEl);
+  });
 
-  // Show the overlay.
+  const body = document.getElementById('viewerBody');
+  body.replaceChildren(bodyFragment);
+
   document.getElementById('docViewerOverlay').classList.add('show');
 
-  // Scroll to first matched line after the DOM has painted.
   if (viewerMatches.length > 0) {
     setTimeout(() => scrollToViewerLine(viewerMatches[0]), 50);
   }
@@ -277,7 +310,6 @@ function scrollToViewerLine(lineIdx) {
  * viewer forward (+1) or backward (-1) through matched lines.
  */
 function navigateViewerMatch(dir) {
-  // Remove active class from the current line.
   document.querySelectorAll('.doc-line.active-match')
     .forEach(el => el.classList.remove('active-match'));
 
@@ -296,8 +328,6 @@ function navigateViewerMatch(dir) {
 
 /**
  * closeViewer(e) — Closes the document viewer modal.
- * Only closes if the click was on the overlay backdrop itself
- * (not on the inner viewer card), or if called with no event.
  */
 function closeViewer(e) {
   if (!e || e.target === document.getElementById('docViewerOverlay')) {
@@ -318,78 +348,92 @@ function updateStats() {
 }
 
 /**
- * updateIndexView() — Shows the first 20 entries of the live inverted
- * index in the sidebar panel. This is a portfolio "wow factor" feature
- * that lets recruiters see the data structure update in real time.
+ * updateIndexView() — Shows the first 20 entries of the live inverted index.
  */
 function updateIndexView() {
   const body    = document.getElementById('indexBody');
-  // Convert Map entries to an array and take the first 20.
   const entries = [...AppState.invertedIndex.entries()].slice(0, 20);
 
-  body.innerHTML = entries.map(([term, postings]) => {
-    const postingChips = [...postings.entries()]
+  // Use DocumentFragment for sidebar index view too (spec §5 consistency)
+  const frag = document.createDocumentFragment();
+  entries.forEach(([term, postings]) => {
+    const row = document.createElement('div');
+    row.className = 'idx-row';
+    const chips = [...postings.entries()]
       .map(([id, freq]) => `<span class="idx-ref">doc:${id}×${freq}</span>`)
       .join('');
-    return `<div class="idx-row">
-      <span class="idx-key">"${escHtml(term)}"</span>
-      ${postingChips}
-    </div>`;
-  }).join('');
+    row.innerHTML = `<span class="idx-key">"${escHtml(term)}"</span>${chips}`;
+    frag.appendChild(row);
+  });
+  body.replaceChildren(frag);
 }
 
 /**
- * updateDocChips() — Renders the list of currently-indexed document
- * chips with individual remove buttons.
+ * updateDocChips() — Renders the list of currently-indexed document chips
+ * with individual remove buttons. Uses data-docid for delegation.
  */
 function updateDocChips() {
   const container = document.getElementById('docChips');
-  if (!container) return; // guard for cases where HTML hasn't loaded yet
+  if (!container) return;
 
   if (AppState.documents.length === 0) {
     container.innerHTML = '<p class="no-docs-hint">No documents indexed yet.</p>';
     return;
   }
 
-  container.innerHTML = AppState.documents.map(d => `
-    <div class="doc-chip">
+  const frag = document.createDocumentFragment();
+  AppState.documents.forEach(d => {
+    const chip = document.createElement('div');
+    chip.className = 'doc-chip';
+    chip.innerHTML = `
       <span class="dot"></span>
       ${escHtml(d.name)}
-      <span class="rm" onclick="removeDoc(${d.id})" title="Remove document">×</span>
-    </div>`).join('');
+      <span class="rm" data-docid="${d.id}" title="Remove document"
+        role="button" tabindex="0" aria-label="Remove ${escHtml(d.name)}">×</span>
+    `;
+    frag.appendChild(chip);
+  });
+  container.replaceChildren(frag);
 }
 
 /**
  * removeDoc(id) — Removes a single document and rebuilds the index.
- * After removal, re-runs the last query so results stay fresh.
  */
 function removeDoc(id) {
   AppState.documents = AppState.documents.filter(d => d.id !== id);
   buildIndex();
-  // Re-run the last query so the results page reflects the removal.
   if (AppState.lastQuery) goToResults(AppState.lastQuery);
 }
 
 // ── HISTORY SIDEBAR ───────────────────────────────────────────────────
 
 /**
- * renderHistory() — Renders the recent-searches list in the sidebar.
+ * renderHistory() — Renders the recent-searches list. Uses data-query
+ * and data-index attributes for event delegation in main.js.
  */
 function renderHistory() {
   const el = document.getElementById('historyList');
   if (!el) return;
 
   if (AppState.searchHistory.length === 0) {
-    el.innerHTML = '<div style="font-size:13px;color:var(--text-dim)">No searches yet</div>';
+    el.innerHTML = '<div style="font-size:13px;color:#9aa0a6">No searches yet</div>';
     return;
   }
 
-  el.innerHTML = AppState.searchHistory.map((h, i) => `
-    <div class="history-item" onclick="triggerSearch('${escHtml(h).replace(/'/g, "\\'")}')">
-      <span class="h-icon">🕐</span>
+  const frag = document.createDocumentFragment();
+  AppState.searchHistory.forEach((h, i) => {
+    const item = document.createElement('div');
+    item.className = 'history-item';
+    item.dataset.query = h;
+    item.innerHTML = `
+      <span class="h-icon" aria-hidden="true">🕐</span>
       <span>${escHtml(h)}</span>
-      <span class="h-remove" onclick="event.stopPropagation();removeHistory(${i})">×</span>
-    </div>`).join('');
+      <span class="h-remove" data-index="${i}"
+        role="button" tabindex="0" aria-label="Remove search: ${escHtml(h)}">×</span>
+    `;
+    frag.appendChild(item);
+  });
+  el.replaceChildren(frag);
 }
 
 /**
@@ -404,7 +448,7 @@ function removeHistory(i) {
 
 /**
  * renderSuggestions(q, boxId) — Populates a suggestions dropdown.
- * Called by the debounced input handler in main.js.
+ * Uses data-suggestion for event delegation in main.js.
  */
 function renderSuggestions(q, boxId) {
   const box   = document.getElementById(boxId);
@@ -415,13 +459,24 @@ function renderSuggestions(q, boxId) {
     return;
   }
 
-  box.innerHTML = items.map(s => `
-    <div class="suggestion-item" onclick="selectSuggestion('${escHtml(s).replace(/'/g, "\\'")}')">
-      <span class="sug-icon">${AppState.searchHistory.includes(s) ? '🕐' : '🔍'}</span>
+  const frag = document.createDocumentFragment();
+  items.forEach(s => {
+    const item = document.createElement('div');
+    item.className = 'suggestion-item';
+    item.dataset.suggestion = s;
+    item.setAttribute('role', 'option');
+    item.innerHTML = `
+      <span class="sug-icon" aria-hidden="true">
+        ${AppState.searchHistory.includes(s)
+          ? '<svg focusable="false" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"><path fill="#9aa0a6" d="M13 3c-4.97 0-9 4.03-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42C8.27 19.99 10.51 21 13 21c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"/></svg>'
+          : '<svg focusable="false" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"><path fill="#9aa0a6" d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>'}
+      </span>
       <span>${escHtml(q)}<mark>${escHtml(s.slice(q.length))}</mark></span>
-      <span class="sug-right">↵</span>
-    </div>`).join('');
-
+      <span class="sug-right" aria-hidden="true">↵</span>
+    `;
+    frag.appendChild(item);
+  });
+  box.replaceChildren(frag);
   box.classList.add('show');
 }
 
@@ -440,12 +495,12 @@ function selectSuggestion(text) {
 /**
  * downloadReport() — Generates a plain-text search report and triggers
  * a browser download via a temporary Blob URL.
- *
- * Blob + URL.createObjectURL is the correct browser-native way to
- * trigger a file download without a server round-trip.
  */
 function downloadReport() {
-  if (!AppState.lastQuery) { alert('Run a search first.'); return; }
+  if (!AppState.lastQuery) {
+    showToast('Run a search first.', 'info');
+    return;
+  }
 
   const lines = [
     `DavSearch Report`,
@@ -470,6 +525,5 @@ function downloadReport() {
   a.href     = URL.createObjectURL(blob);
   a.download = `davsearch-${AppState.lastQuery.replace(/\s+/g, '-')}.txt`;
   a.click();
-  // Revoke the object URL after a short delay to free browser memory.
   setTimeout(() => URL.revokeObjectURL(a.href), 5000);
 }

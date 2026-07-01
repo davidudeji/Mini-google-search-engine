@@ -2,241 +2,440 @@
 <html lang="en">
 
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description"
-        content="DavSearch — a client-side search engine with TF-IDF ranking, fuzzy typo-tolerance, and live inverted index built in vanilla JavaScript.">
-    <title>DavSearch — Client-Side Search Engine</title>
-
-    <!-- Google Fonts: display headings, body, and monospace code -->
-    <link
-        href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&family=Roboto:wght@300;400;500&family=JetBrains+Mono:wght@400;500&display=swap"
-        rel="stylesheet">
-    <!-- Material Icons for the search icon in the home bar -->
-    <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
-    <link rel="stylesheet" href="src/styles/base.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description"
+    content="DavSearch — a client-side search engine with TF-IDF ranking, fuzzy typo-tolerance, and a live inverted index built in vanilla JavaScript.">
+  <title>DavSearch — Client-Side Search Engine</title>
+  <!--
+    Zero external dependencies — spec §1.
+    System fonts used throughout — spec §2.
+    All icons are native inline SVGs — spec §1.
+  -->
+  <link rel="stylesheet" href="src/styles/base.css">
 </head>
 
 <body>
 
-    <!-- ══════════════════════════════════════════════════════════════
-         GLOBAL DRAG-AND-DROP OVERLAY
-         Full-page overlay shown when the user drags a file anywhere
-         over the window. Handled by setupGlobalDrop() in uploader.js.
-    ════════════════════════════════════════════════════════════════ -->
-    <div id="globalDropOverlay" class="global-drop-overlay">
-        <div class="drop-target-inner">
-            <div class="drop-icon">📂</div>
-            <div class="drop-label">Drop files to index</div>
-            <div class="drop-sub">.txt or .md files · max 10MB each</div>
-        </div>
+  <!-- ══════════════════════════════════════════════════════════════
+       GLOBAL DRAG-AND-DROP OVERLAY
+       Full-page overlay shown when the user drags a file anywhere
+       over the window. Handled by setupGlobalDrop() in uploader.js.
+  ════════════════════════════════════════════════════════════════ -->
+  <div id="globalDropOverlay" class="global-drop-overlay">
+    <div class="drop-target-inner">
+      <div class="drop-icon">📂</div>
+      <div class="drop-label">Drop files to index</div>
+      <div class="drop-sub">.txt or .md files · max 10 MB each</div>
+    </div>
+  </div>
+
+  <!-- Loading indicator shown while FileReader processes files -->
+  <div id="loadingIndicator" class="loading-indicator" style="display:none">
+    <div class="loading-spinner"></div>
+    <span>Indexing documents…</span>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       HOME PAGE (pre-search state)
+       Spec §3: Flexbox centers box on screen.
+       Spec §3: Search box height 44px, max-width 584px, radius 24px.
+  ════════════════════════════════════════════════════════════════ -->
+  <div id="homePage">
+
+    <!-- Coloured logo -->
+    <div class="home-logo" aria-label="DavSearch">
+      <span class="logo-d">D</span><span class="logo-a">a</span><span
+        class="logo-v">v</span><span class="logo-s">S</span><span
+        class="logo-e2">e</span><span class="logo-a2">a</span><span
+        class="logo-r">r</span><span class="logo-c">c</span><span
+        class="logo-h">h</span>
     </div>
 
-    <!-- Loading indicator shown while FileReader processes files -->
-    <div id="loadingIndicator" class="loading-indicator" style="display:none">
-        <div class="loading-spinner"></div>
-        <span>Indexing documents…</span>
-    </div>
+    <!--
+      Native <form> — spec §5: queries captured via standard form submit events.
+      action="#" prevents full-page reload; JS intercepts the submit event.
+    -->
+    <form id="homeForm" action="#" autocomplete="off" role="search">
+      <div class="search-bar-wrap" id="homeBarWrap">
+        <div class="search-bar" id="homeBar">
 
-    <!-- ══════════════════════════════════════════════════════════════
-         HOME PAGE (pre-search state)
-    ════════════════════════════════════════════════════════════════ -->
-    <div id="homePage">
-        <div class="home-logo">
-            <span class="logo-d">D</span><span class="logo-a">a</span><span class="logo-v">v</span><span
-                class="logo-s">S</span><span class="logo-e2">e</span><span class="logo-a2">a</span><span
-                class="logo-r">r</span><span class="logo-c">c</span><span class="logo-h">h</span>
-        </div>
+          <!-- Search icon (inline SVG — zero external deps) -->
+          <span class="search-icon-left" aria-hidden="true">
+            <svg focusable="false" xmlns="http://www.w3.org/2000/svg"
+              width="20" height="20" viewBox="0 0 24 24">
+              <path fill="#9aa0a6"
+                d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0
+                   3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5
+                   9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
+            </svg>
+          </span>
 
-        <div class="search-bar-wrap" id="homeBarWrap">
-            <div class="search-bar" id="homeBar">
-                <span class="material-icons search-icon-left" style="font-size:20px;color:var(--text-muted)">search</span>
-                <input class="search-input" id="homeInput" placeholder="Search your documents…" autocomplete="off"
-                    aria-label="Search your indexed documents">
-                <div class="search-bar-right">
-                    <button class="icon-btn" id="homeClear" title="Clear search" style="display:none"
-                        aria-label="Clear">✕</button>
-                    <div class="divider-v"></div>
-                    <button class="icon-btn" title="Search" aria-label="Search" onclick="triggerSearch()">→</button>
-                </div>
-            </div>
-            <div class="suggestions-box" id="homeSuggestions" role="listbox"></div>
-        </div>
+          <input class="search-input" id="homeInput"
+            name="q"
+            type="search"
+            placeholder="Search your documents…"
+            autocomplete="off"
+            aria-label="Search your indexed documents"
+            spellcheck="false">
 
-        <div class="home-buttons">
-            <button class="home-btn" onclick="loadSampleData()" id="btnLoadSample">📚 Load Sample Data</button>
-            <button class="home-btn" onclick="document.getElementById('fileInput').click()" id="btnUpload">
-                ⬆ Upload Files
+          <div class="search-bar-right">
+            <!-- Clear button — hidden until user types -->
+            <button class="icon-btn" id="homeClear" type="button"
+              title="Clear search" aria-label="Clear" style="display:none">
+              <svg focusable="false" xmlns="http://www.w3.org/2000/svg"
+                width="18" height="18" viewBox="0 0 24 24">
+                <path fill="#70757a"
+                  d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59
+                     6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+              </svg>
             </button>
-            <!-- Hidden file input shared by all upload triggers -->
-            <input type="file" id="fileInput" multiple accept=".txt,.md" style="display:none"
-                onchange="handleFileInput(this.files)">
+
+            <div class="divider-v" aria-hidden="true"></div>
+
+            <!-- Voice search icon (decorative) -->
+            <button class="icon-btn" type="button"
+              title="Search by voice" aria-label="Search by voice">
+              <svg focusable="false" xmlns="http://www.w3.org/2000/svg"
+                width="20" height="20" viewBox="0 0 24 24">
+                <path fill="#4285f4"
+                  d="M12 15c1.66 0 2.99-1.34 2.99-3L15 6c0-1.66-1.34-3-3-3S9 4.34 9 6v6c0 1.66
+                     1.34 3 3 3zm5.3-3c0 3-2.54 5.1-5.3 5.1S6.7 15 6.7 12H5c0 3.42 2.72 6.23 6
+                     6.72V22h2v-3.28c3.28-.48 6-3.3 6-6.72h-1.7z"/>
+              </svg>
+            </button>
+
+            <!-- Camera / image search icon (decorative) -->
+            <button class="icon-btn" type="button"
+              title="Search by image" aria-label="Search by image">
+              <svg focusable="false" xmlns="http://www.w3.org/2000/svg"
+                width="20" height="20" viewBox="0 0 24 24">
+                <path fill="#ea4335"
+                  d="M9 3L7.17 5H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9
+                     2-2V7c0-1.1-.9-2-2-2h-3.17L15 3H9zm3 15c-2.76 0-5-2.24-5-5s2.24-5
+                     5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34
+                     3-3-1.34-3-3-3z"/>
+              </svg>
+            </button>
+          </div>
         </div>
 
-        <div class="home-hint">
-            Drop a <span class="hint-code">.txt</span> or <span class="hint-code">.md</span> file anywhere
-            &nbsp;·&nbsp; TF-IDF scoring &nbsp;·&nbsp; Fuzzy typo-tolerance
-            &nbsp;·&nbsp; <kbd class="kbd">Ctrl+K</kbd> to focus
-        </div>
+        <div class="suggestions-box" id="homeSuggestions" role="listbox"
+          aria-label="Search suggestions"></div>
+      </div>
+    </form>
+
+    <div class="home-buttons">
+      <button class="home-btn" id="btnLoadSample"
+        onclick="loadSampleData()">Load Sample Data</button>
+      <button class="home-btn" id="btnUpload"
+        onclick="document.getElementById('fileInput').click()">Upload Files</button>
+      <!-- Hidden file input shared by all upload triggers -->
+      <input type="file" id="fileInput" multiple accept=".txt,.md"
+        style="display:none" onchange="handleFileInput(this.files)">
     </div>
 
-    <!-- ══════════════════════════════════════════════════════════════
-         RESULTS PAGE (post-search state)
-    ════════════════════════════════════════════════════════════════ -->
-    <div id="resultsPage">
-
-        <!-- STICKY HEADER ─────────────────────────────────────────── -->
-        <div class="results-header">
-            <!-- Clicking the logo goes back to home -->
-            <a class="results-logo" onclick="goHome()" role="button" aria-label="Go to home page">
-                <span class="logo-d">D</span><span class="logo-a">a</span><span class="logo-v">v</span>
-            </a>
-
-            <div class="search-bar-wrap" id="resultsBarWrap">
-                <div class="search-bar no-suggest" id="resultsBar">
-                    <span class="material-icons search-icon-left" style="font-size:18px;color:var(--text-muted)">search</span>
-                    <input class="search-input" id="resultsInput" placeholder="Search your documents…"
-                        autocomplete="off" aria-label="Refine your search">
-                    <div class="search-bar-right">
-                        <button class="icon-btn" id="resultsClear" title="Clear" style="display:none"
-                            aria-label="Clear">✕</button>
-                        <div class="divider-v"></div>
-                        <button class="icon-btn" title="Search" onclick="triggerSearch()" aria-label="Search">→</button>
-                    </div>
-                </div>
-                <div class="suggestions-box" id="resultsSuggestions" role="listbox"></div>
-            </div>
-
-            <div class="header-icons">
-                <button class="icon-btn header-upload-btn" title="Upload files"
-                    onclick="document.getElementById('fileInput').click()" aria-label="Upload files">⬆</button>
-                <button class="icon-btn" title="Reset session" onclick="resetSession()" aria-label="Reset all indexed documents"
-                    style="color:var(--red)">⊗</button>
-            </div>
-        </div>
-
-        <!-- TABS ──────────────────────────────────────────────────── -->
-        <div class="results-tabs" role="tablist">
-            <div class="tab active" role="tab">Documents</div>
-            <div class="tab" role="tab">Vocabulary</div>
-            <div class="tab" role="tab">Index</div>
-        </div>
-
-        <!-- BODY ──────────────────────────────────────────────────── -->
-        <div class="results-body">
-
-            <!-- MAIN RESULTS ──────────────────────────────────────── -->
-            <div class="results-main">
-                <div class="results-meta" id="resultsMeta"></div>
-
-                <!-- Fuzzy correction banner -->
-                <div id="correctionBanner" style="display:none" class="correction-chip" role="alert">
-                    ⚠ Showing results for: <strong id="correctionWord"></strong>&nbsp;
-                    <span class="apply-fix" id="applyFix">Search instead for original →</span>
-                </div>
-
-                <div id="resultsList" role="list"></div>
-            </div>
-
-            <!-- SIDEBAR ───────────────────────────────────────────── -->
-            <div class="results-sidebar">
-
-                <!-- STATS GRID -->
-                <div class="stats-grid">
-                    <div class="stat-box">
-                        <div class="s-val" id="sDocCount">0</div>
-                        <div class="s-label">Docs indexed</div>
-                    </div>
-                    <div class="stat-box">
-                        <div class="s-val" id="sVocabCount">0</div>
-                        <div class="s-label">Unique terms</div>
-                    </div>
-                    <div class="stat-box">
-                        <div class="s-val" id="sQueryTime">—</div>
-                        <div class="s-label">Query time</div>
-                    </div>
-                    <div class="stat-box">
-                        <div class="s-val" id="sResultCount">—</div>
-                        <div class="s-label">Results found</div>
-                    </div>
-                </div>
-
-                <!-- UPLOAD ZONE (sideDropZone — required by uploader.js) -->
-                <div class="sidebar-section">
-                    <div class="sidebar-title">Add Documents</div>
-                    <div class="upload-zone" id="sideDropZone" role="button"
-                        aria-label="Click or drag files here to upload">
-                        <div class="upload-zone-icon">📂</div>
-                        <div>Click or drop <span style="color:var(--accent)">.txt</span> /
-                            <span style="color:var(--accent)">.md</span> files here</div>
-                    </div>
-                    <!-- Indexed document chips (docChips — required by renderer.js) -->
-                    <div id="docChips"></div>
-                </div>
-
-                <!-- QUERY HISTORY -->
-                <div class="sidebar-section">
-                    <div class="sidebar-title">Recent Searches</div>
-                    <div id="historyList"></div>
-                </div>
-
-                <!-- LIVE INDEX VIEWER -->
-                <div class="sidebar-section">
-                    <div class="index-panel">
-                        <div class="index-panel-header">
-                            <span>Live Index</span>
-                            <span id="indexTermCount" style="color:var(--text-dim)">0 terms</span>
-                        </div>
-                        <div class="index-panel-body" id="indexBody"></div>
-                    </div>
-                </div>
-
-                <!-- ACTIONS -->
-                <div class="sidebar-actions">
-                    <button class="download-btn" onclick="downloadReport()">⬇ Download Search Report</button>
-                    <button class="reset-btn" onclick="resetSession()">⊗ Reset Session</button>
-                </div>
-
-            </div>
-        </div>
+    <div class="home-hint">
+      Drop a <span class="hint-code">.txt</span> or
+      <span class="hint-code">.md</span> file anywhere on the page
+      <br>or click <strong>Load Sample Data</strong> to start instantly
+      &nbsp;·&nbsp; <kbd class="kbd">Ctrl+K</kbd> to focus search
     </div>
 
-    <!-- ══════════════════════════════════════════════════════════════
-         DOCUMENT VIEWER MODAL
-         Full-document view with line numbers and match navigation.
-    ════════════════════════════════════════════════════════════════ -->
-    <div class="doc-viewer-overlay" id="docViewerOverlay" onclick="closeViewer(event)" role="dialog"
-        aria-modal="true" aria-labelledby="viewerTitle">
-        <div class="doc-viewer" onclick="event.stopPropagation()">
-            <div class="doc-viewer-header">
-                <div class="doc-viewer-title" id="viewerTitle">document.txt</div>
-                <div class="viewer-match-nav">
-                    <span id="viewerMatchInfo"
-                        style="font-size:12px;font-family:var(--mono);color:var(--text-muted)"></span>
-                    <button class="match-nav-btn" id="viewerPrev" onclick="navigateViewerMatch(-1)"
-                        aria-label="Previous match">↑</button>
-                    <button class="match-nav-btn" id="viewerNext" onclick="navigateViewerMatch(1)"
-                        aria-label="Next match">↓</button>
-                </div>
-                <button class="icon-btn" onclick="closeViewer()" aria-label="Close viewer"
-                    style="margin-left:8px">✕</button>
+  </div><!-- /#homePage -->
+
+  <!-- ══════════════════════════════════════════════════════════════
+       RESULTS PAGE (SERP)
+       Spec §3 desktop: 169px left margin, 652px card max-width.
+  ════════════════════════════════════════════════════════════════ -->
+  <div id="resultsPage">
+
+    <!-- STICKY HEADER ─────────────────────────────────────────── -->
+    <div class="results-header">
+
+      <!-- 3-letter brand logo, navigates home on click -->
+      <a class="results-logo" id="resultsLogoLink"
+        role="button" aria-label="Go to DavSearch home" tabindex="0">
+        <span class="logo-d">D</span><span class="logo-a">a</span><span
+          class="logo-v">v</span>
+      </a>
+
+      <!-- SERP search form — spec §5: form submit event -->
+      <form id="resultsForm" action="#" autocomplete="off"
+        role="search" style="flex:1;min-width:0">
+        <div class="search-bar-wrap" id="resultsBarWrap">
+          <div class="search-bar no-suggest" id="resultsBar">
+
+            <span class="search-icon-left" aria-hidden="true">
+              <svg focusable="false" xmlns="http://www.w3.org/2000/svg"
+                width="18" height="18" viewBox="0 0 24 24">
+                <path fill="#9aa0a6"
+                  d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61
+                     0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5
+                     11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
+              </svg>
+            </span>
+
+            <input class="search-input" id="resultsInput"
+              name="q"
+              type="search"
+              placeholder="Search your documents…"
+              autocomplete="off"
+              aria-label="Refine your search"
+              spellcheck="false">
+
+            <div class="search-bar-right">
+              <button class="icon-btn" id="resultsClear" type="button"
+                title="Clear" aria-label="Clear" style="display:none">
+                <svg focusable="false" xmlns="http://www.w3.org/2000/svg"
+                  width="18" height="18" viewBox="0 0 24 24">
+                  <path fill="#70757a"
+                    d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59
+                       6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+                </svg>
+              </button>
+
+              <div class="divider-v" aria-hidden="true"></div>
+
+              <button class="icon-btn" type="button"
+                title="Search by voice" aria-label="Search by voice">
+                <svg focusable="false" xmlns="http://www.w3.org/2000/svg"
+                  width="20" height="20" viewBox="0 0 24 24">
+                  <path fill="#4285f4"
+                    d="M12 15c1.66 0 2.99-1.34 2.99-3L15 6c0-1.66-1.34-3-3-3S9 4.34 9 6v6c0 1.66
+                       1.34 3 3 3zm5.3-3c0 3-2.54 5.1-5.3 5.1S6.7 15 6.7 12H5c0 3.42 2.72 6.23 6
+                       6.72V22h2v-3.28c3.28-.48 6-3.3 6-6.72h-1.7z"/>
+                </svg>
+              </button>
+
+              <!-- Apps icon -->
+              <button class="icon-btn" type="button"
+                title="Google apps" aria-label="Google apps">
+                <svg focusable="false" xmlns="http://www.w3.org/2000/svg"
+                  width="20" height="20" viewBox="0 0 24 24">
+                  <path fill="#5f6368"
+                    d="M6 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm6 0c1.1 0 2-.9
+                       2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm6 0c1.1 0 2-.9 2-2s-.9-2-2-2-2
+                       .9-2 2 .9 2 2 2zM6 14c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2
+                       2zm6 0c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm6 0c1.1 0 2-.9
+                       2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zM6 20c1.1 0 2-.9 2-2s-.9-2-2-2-2
+                       .9-2 2 .9 2 2 2zm6 0c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm6
+                       0c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2z"/>
+                </svg>
+              </button>
             </div>
-            <div class="doc-viewer-body" id="viewerBody"></div>
+          </div>
+
+          <div class="suggestions-box" id="resultsSuggestions" role="listbox"
+            aria-label="Search suggestions"></div>
         </div>
+      </form>
+
+      <!-- Upload + Reset icons -->
+      <div class="header-icons">
+        <button class="icon-btn header-upload-btn" type="button"
+          id="headerUploadBtn"
+          title="Upload files" aria-label="Upload files">
+          <svg focusable="false" xmlns="http://www.w3.org/2000/svg"
+            width="20" height="20" viewBox="0 0 24 24">
+            <path fill="#5f6368"
+              d="M9 16h6v-6h4l-7-7-7 7h4zm-4 2h14v2H5z"/>
+          </svg>
+        </button>
+
+        <button class="icon-btn" type="button"
+          id="headerResetBtn"
+          title="Reset session" aria-label="Reset all indexed documents"
+          style="color:#ea4335">
+          <svg focusable="false" xmlns="http://www.w3.org/2000/svg"
+            width="20" height="20" viewBox="0 0 24 24">
+            <path fill="#ea4335"
+              d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm5 13.59L15.59
+                 17 12 13.41 8.41 17 7 15.59 10.59 12 7 8.41 8.41 7 12 10.59 15.59 7 17 8.41
+                 13.41 12 17 15.59z"/>
+          </svg>
+        </button>
+      </div>
+
+    </div><!-- /.results-header -->
+
+    <!-- TABS ──────────────────────────────────────────────────── -->
+    <div class="results-tabs" role="tablist">
+      <div class="tab active" role="tab" aria-selected="true"
+        id="tab-documents">
+        <svg focusable="false" xmlns="http://www.w3.org/2000/svg"
+          width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
+          <path fill="currentColor"
+            d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9
+               2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/>
+        </svg>
+        Documents
+      </div>
+      <div class="tab" role="tab" aria-selected="false" id="tab-vocabulary">
+        <svg focusable="false" xmlns="http://www.w3.org/2000/svg"
+          width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
+          <path fill="currentColor"
+            d="M12.87 15.07l-2.54-2.51.03-.03A17.52 17.52 0 0 0 14.07 6H17V4h-7V2H8v2H1v1.99h11.17C11.5
+               7.92 10.44 9.75 9 11.35 8.07 10.32 7.3 9.19 6.69 8h-2c.73 1.63 1.73 3.17 2.98 4.56l-5.09
+               5.02L4 19l5-5 3.11 3.11.76-2.04zM18.5 10h-2L12 22h2l1.12-3h4.75L21 22h2l-4.5-12zm-2.62
+               7l1.62-4.33L19.12 17h-3.24z"/>
+        </svg>
+        Vocabulary
+      </div>
+      <div class="tab" role="tab" aria-selected="false" id="tab-index">
+        <svg focusable="false" xmlns="http://www.w3.org/2000/svg"
+          width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
+          <path fill="currentColor"
+            d="M4 14h4v-4H4v4zm0 5h4v-4H4v4zM4 9h4V5H4v4zm5 5h12v-4H9v4zm0 5h12v-4H9v4zM9 5v4h12V5H9z"/>
+        </svg>
+        Index
+      </div>
     </div>
 
-    <!-- ══════════════════════════════════════════════════════════════
-         SCRIPTS — loaded in strict dependency order:
-         Each file depends only on globals defined by files above it.
-    ════════════════════════════════════════════════════════════════ -->
-    <script src="src/state/store.js"></script>
-    <script src="src/utils/preprocessor.js"></script>
-    <script src="src/utils/fuzzy.js"></script>
-    <script src="src/engine/indexer.js"></script>
-    <script src="src/engine/search.js"></script>
-    <script src="src/ui/renderer.js"></script>
-    <script src="src/ui/uploader.js"></script>
-    <script src="src/main.js"></script>
+    <!-- BODY ──────────────────────────────────────────────────── -->
+    <div class="results-body">
+
+      <!-- MAIN RESULTS ──────────────────────────────────────── -->
+      <div class="results-main">
+        <div class="results-meta" id="resultsMeta"></div>
+
+        <!-- Fuzzy correction banner -->
+        <div id="correctionBanner" style="display:none"
+          class="correction-chip" role="alert">
+          Showing results for: <strong id="correctionWord"></strong>&nbsp;
+          <span class="apply-fix" id="applyFix">
+            Search instead for original →
+          </span>
+        </div>
+
+        <!-- Result cards injected here via DocumentFragment -->
+        <div id="resultsList" role="list"></div>
+      </div>
+
+      <!-- SIDEBAR ───────────────────────────────────────────── -->
+      <div class="results-sidebar">
+
+        <!-- STATS GRID -->
+        <div class="stats-grid">
+          <div class="stat-box">
+            <div class="s-val" id="sDocCount">0</div>
+            <div class="s-label">Docs indexed</div>
+          </div>
+          <div class="stat-box">
+            <div class="s-val" id="sVocabCount">0</div>
+            <div class="s-label">Unique terms</div>
+          </div>
+          <div class="stat-box">
+            <div class="s-val" id="sQueryTime">—</div>
+            <div class="s-label">Query time</div>
+          </div>
+          <div class="stat-box">
+            <div class="s-val" id="sResultCount">—</div>
+            <div class="s-label">Results found</div>
+          </div>
+        </div>
+
+        <!-- UPLOAD ZONE (sideDropZone — required by uploader.js) -->
+        <div class="sidebar-section">
+          <div class="sidebar-title">Add Documents</div>
+          <div class="upload-zone" id="sideDropZone" role="button"
+            tabindex="0" aria-label="Click or drag files here to upload">
+            <div class="upload-zone-icon">📁</div>
+            <div>Click or drop
+              <span style="color:var(--accent)">.txt</span> /
+              <span style="color:var(--accent)">.md</span> files here
+            </div>
+          </div>
+          <!-- Indexed document chips (docChips — required by renderer.js) -->
+          <div id="docChips"></div>
+        </div>
+
+        <!-- QUERY HISTORY -->
+        <div class="sidebar-section">
+          <div class="sidebar-title">Recent Searches</div>
+          <div id="historyList"></div>
+        </div>
+
+        <!-- LIVE INDEX VIEWER -->
+        <div class="sidebar-section">
+          <div class="index-panel">
+            <div class="index-panel-header">
+              <span>Live Index</span>
+              <span id="indexTermCount" style="color:#9aa0a6">0 terms</span>
+            </div>
+            <div class="index-panel-body" id="indexBody"></div>
+          </div>
+        </div>
+
+        <!-- ACTIONS -->
+        <div class="sidebar-actions">
+          <button class="download-btn" id="downloadReportBtn">
+            <svg focusable="false" xmlns="http://www.w3.org/2000/svg"
+              width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
+              <path fill="#5f6368"
+                d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
+            </svg>
+            Download Search Report
+          </button>
+          <button class="reset-btn" id="sidebarResetBtn">
+            <svg focusable="false" xmlns="http://www.w3.org/2000/svg"
+              width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
+              <path fill="currentColor"
+                d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm5 13.59L15.59
+                   17 12 13.41 8.41 17 7 15.59 10.59 12 7 8.41 8.41 7 12 10.59 15.59 7 17 8.41
+                   13.41 12 17 15.59z"/>
+            </svg>
+            Reset Session
+          </button>
+        </div>
+
+      </div><!-- /.results-sidebar -->
+    </div><!-- /.results-body -->
+  </div><!-- /#resultsPage -->
+
+  <!-- ══════════════════════════════════════════════════════════════
+       DOCUMENT VIEWER MODAL
+       Full-document view with line numbers and match navigation.
+  ════════════════════════════════════════════════════════════════ -->
+  <div class="doc-viewer-overlay" id="docViewerOverlay"
+    role="dialog" aria-modal="true" aria-labelledby="viewerTitle">
+    <div class="doc-viewer">
+      <div class="doc-viewer-header">
+        <div class="doc-viewer-title" id="viewerTitle">document.txt</div>
+        <div class="viewer-match-nav">
+          <span id="viewerMatchInfo"
+            style="font-size:12px;font-family:monospace;color:#9aa0a6"></span>
+          <button class="match-nav-btn" id="viewerPrev"
+            aria-label="Previous match">↑</button>
+          <button class="match-nav-btn" id="viewerNext"
+            aria-label="Next match">↓</button>
+        </div>
+        <button class="icon-btn" id="viewerCloseBtn"
+          aria-label="Close viewer" style="margin-left:8px">
+          <svg focusable="false" xmlns="http://www.w3.org/2000/svg"
+            width="18" height="18" viewBox="0 0 24 24">
+            <path fill="#5f6368"
+              d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59
+                 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+          </svg>
+        </button>
+      </div>
+      <div class="doc-viewer-body" id="viewerBody"></div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       SCRIPTS — loaded in strict dependency order.
+       Deferred where possible — spec §1.
+  ════════════════════════════════════════════════════════════════ -->
+  <script src="src/state/store.js"></script>
+  <script src="src/utils/preprocessor.js"></script>
+  <script src="src/utils/fuzzy.js"></script>
+  <script src="src/engine/indexer.js"></script>
+  <script src="src/engine/search.js"></script>
+  <script src="src/ui/renderer.js"></script>
+  <script src="src/ui/uploader.js"></script>
+  <script defer src="src/main.js"></script>
 
 </body>
 

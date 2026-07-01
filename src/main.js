@@ -6,6 +6,13 @@
 //  by attaching event listeners and calling init functions. It contains
 //  NO business logic — only orchestration.
 //
+//  Spec §5 compliance:
+//    • Native form submit events capture all search queries.
+//    • A single delegated listener on `document` handles all UI clicks
+//      (result cards, suggestions, history items, buttons) instead of
+//      attaching discrete listeners to individual elements.
+//    • DocumentFragment usage lives in renderer.js (renderResults).
+//
 //  Loading order (enforced by index.html <script> tag order):
 //    1. store.js       → AppState defined
 //    2. preprocessor.js → STOP_WORDS, stem, tokenize, tokenizeAndStem
@@ -14,20 +21,13 @@
 //    5. search.js       → search, findMatches, buildSnippet, getSuggestions, escHtml
 //    6. renderer.js     → renderResults, updateStats, etc.
 //    7. uploader.js     → handleFileInput, setupDrop, setupGlobalDrop
-//    8. main.js (THIS)  → event listeners + init
+//    8. main.js (THIS, defer) → event listeners + init
 
 // ── DEBOUNCE UTILITY ─────────────────────────────────────────────────
 //
-//  What is debouncing?
-//  Without debouncing, every single keystroke triggers a search or
-//  suggestion lookup. For fast typists at 5 keys/sec, that's 5 full
-//  search executions per second. Debouncing delays execution until
-//  the user has paused typing for `ms` milliseconds.
-//
-//  How it works:
-//    timer is cleared on every call.
-//    A new timer is set on every call.
-//    The function only executes when no new call comes in for `ms` ms.
+//  Without debouncing, every keystroke triggers a search/suggestion
+//  lookup. Debouncing delays execution until the user pauses typing
+//  for `ms` milliseconds, preventing unnecessary engine calls.
 //
 //  For suggestions: 180ms — fast enough to feel instant.
 //  For auto-search: 320ms — avoids running search mid-word.
@@ -35,16 +35,13 @@
 function debounce(fn, ms) {
   let timer;
   return (...args) => {
-    // Cancel the previously scheduled call.
     clearTimeout(timer);
-    // Schedule a new call. If this function is called again within `ms`,
-    // this timer will be cancelled before it fires.
     timer = setTimeout(() => fn(...args), ms);
   };
 }
 
 const debouncedSuggest = debounce((q, boxId) => renderSuggestions(q, boxId), 180);
-const debouncedSearch  = debounce((q) => { if (q.trim()) goToResults(q); }, 320);
+const debouncedSearch = debounce((q) => { if (q.trim()) goToResults(q); }, 320);
 
 // ── PAGE NAVIGATION ───────────────────────────────────────────────────
 
@@ -53,8 +50,8 @@ function isResultsPage() {
 }
 
 /**
- * triggerSearch(query) — Called by buttons, keyboard Enter, and suggestion
- * clicks. Gets the active input value if no query is passed directly.
+ * triggerSearch(query) — Called by form submits, keyboard Enter, and
+ * suggestion clicks. Gets the active input value if no query is passed.
  */
 function triggerSearch(query) {
   const q = query !== undefined
@@ -71,7 +68,7 @@ function goToResults(query) {
   document.getElementById('resultsPage').classList.add('show');
 
   // Sync both input fields with the current query.
-  document.getElementById('homeInput').value    = query;
+  document.getElementById('homeInput').value = query;
   document.getElementById('resultsInput').value = query;
   document.getElementById('resultsClear').style.display = 'flex';
   document.querySelectorAll('.suggestions-box').forEach(b => b.classList.remove('show'));
@@ -100,7 +97,6 @@ function goHome() {
 
 /**
  * resetSession() — Clears ALL documents, the index, and search history.
- * This gives users a clean slate without reloading the page.
  */
 function resetSession() {
   if (AppState.documents.length === 0 && AppState.searchHistory.length === 0) {
@@ -108,20 +104,14 @@ function resetSession() {
     return;
   }
 
-  // Wipe the document store.
   AppState.documents.length = 0;
-
-  // Clear the index data structures.
   AppState.invertedIndex.clear();
   AppState.vocabulary.clear();
   AppState.stemMap.clear();
-
-  // Clear UI state.
   AppState.searchHistory.length = 0;
-  AppState.lastQuery   = '';
+  AppState.lastQuery = '';
   AppState.lastResults = [];
 
-  // Refresh all panels.
   updateStats();
   updateIndexView();
   updateDocChips();
@@ -137,13 +127,13 @@ function resetSession() {
  * setupInput(inputId, barId, sugBoxId) — Wires up focus, blur, input,
  * clear, and keydown handlers for a search bar.
  *
- * The is-active and focused-solo CSS classes drive the visual state:
- *   focused-solo: focused but empty → accent-colored ring
- *   is-active:    focused with text → elevated shadow + suggestion box open
+ * CSS class logic:
+ *   focused-solo: focused but empty → subtle ring
+ *   is-active:    focused with text → shadow + suggestion box open
  */
 function setupInput(inputId, barId, sugBoxId) {
-  const input    = document.getElementById(inputId);
-  const bar      = document.getElementById(barId);
+  const input = document.getElementById(inputId);
+  const bar = document.getElementById(barId);
   const clearBtnId = inputId === 'homeInput' ? 'homeClear' : 'resultsClear';
   const clearBtn = document.getElementById(clearBtnId);
 
@@ -158,8 +148,8 @@ function setupInput(inputId, barId, sugBoxId) {
     }
   });
 
-  // Delayed blur: allows click events on suggestion items to fire BEFORE
-  // the suggestions box is hidden. 150ms is enough for a click to register.
+  // Delayed blur: allows suggestion item clicks to fire BEFORE the
+  // suggestions box is hidden. 150ms is enough for a click to register.
   input.addEventListener('blur', () => {
     setTimeout(() => {
       bar.classList.remove('is-active', 'focused-solo');
@@ -193,7 +183,7 @@ function setupInput(inputId, barId, sugBoxId) {
   });
 
   input.addEventListener('keydown', e => {
-    if (e.key === 'Enter')  triggerSearch(input.value);
+    if (e.key === 'Enter') { /* form submit handles this */ }
     if (e.key === 'Escape') {
       document.getElementById(sugBoxId)?.classList.remove('show');
       input.blur();
@@ -205,8 +195,6 @@ function setupInput(inputId, barId, sugBoxId) {
 
 /**
  * loadSampleData() — Loads 4 rich sample documents for instant demo.
- * Called from the "Load Sample Data" button on the home page.
- * After loading, moves focus to the search bar.
  */
 function loadSampleData() {
   AppState.documents = [
@@ -232,35 +220,155 @@ function loadSampleData() {
   document.getElementById('homeInput').focus();
 }
 
-// ── INIT ──────────────────────────────────────────────────────────────
+// ── FORM SUBMIT EVENTS (spec §5) ──────────────────────────────────────
+//
+//  Native form submit events replace onClick-based search triggering.
+//  preventDefault() stops the default GET request; JS handles routing.
 
-// Wire up both search bars.
-setupInput('homeInput',    'homeBar',    'homeSuggestions');
-setupInput('resultsInput', 'resultsBar', 'resultsSuggestions');
+document.getElementById('homeForm').addEventListener('submit', e => {
+  e.preventDefault();
+  triggerSearch(document.getElementById('homeInput').value);
+});
 
-// Wire up the sidebar drop zone and global page drop zone.
-setupDrop('sideDropZone');
-setupGlobalDrop();
+document.getElementById('resultsForm').addEventListener('submit', e => {
+  e.preventDefault();
+  triggerSearch(document.getElementById('resultsInput').value);
+});
 
-// Wire up the correction banner "Search instead for original" link.
-document.getElementById('applyFix')?.addEventListener('click', () => {
-  document.getElementById('correctionBanner').style.display = 'none';
+// ── EVENT DELEGATION (spec §5) ────────────────────────────────────────
+//
+//  A single listener on `document` intercepts all UI interactions via
+//  event bubbling. This avoids attaching N individual listeners as the
+//  DOM grows, and correctly handles dynamically injected elements
+//  (result cards, suggestion items, history entries) that didn't exist
+//  at page load time.
+//
+//  Pattern: check e.target (or closest ancestor) for a data attribute
+//  or CSS class, then dispatch to the appropriate handler.
+
+document.addEventListener('click', e => {
+  const t = e.target;
+
+  // ── Logo → go home ───────────────────────────────────────────────
+  if (t.closest('#resultsLogoLink')) {
+    goHome();
+    return;
+  }
+
+  // ── Suggestion item click ─────────────────────────────────────────
+  const sugItem = t.closest('.suggestion-item');
+  if (sugItem) {
+    const text = sugItem.dataset.suggestion;
+    if (text) selectSuggestion(text);
+    return;
+  }
+
+  // ── History item click ────────────────────────────────────────────
+  const histItem = t.closest('.history-item');
+  if (histItem && !t.classList.contains('h-remove')) {
+    const query = histItem.dataset.query;
+    if (query) triggerSearch(query);
+    return;
+  }
+  if (t.classList.contains('h-remove')) {
+    const idx = parseInt(t.dataset.index, 10);
+    if (!isNaN(idx)) removeHistory(idx);
+    return;
+  }
+
+  // ── Result title click ────────────────────────────────────────────
+  const resultTitle = t.closest('.result-title');
+  if (resultTitle) {
+    const docId = parseInt(resultTitle.dataset.docid, 10);
+    const query = resultTitle.dataset.query;
+    if (!isNaN(docId)) openDocViewer(docId, query || AppState.lastQuery);
+    return;
+  }
+
+  // ── View all link ─────────────────────────────────────────────────
+  const viewAll = t.closest('.view-all-link');
+  if (viewAll) {
+    const docId = parseInt(viewAll.dataset.docid, 10);
+    if (!isNaN(docId)) openDocViewer(docId, AppState.lastQuery);
+    return;
+  }
+
+  // ── Match nav buttons (prev/next per card) ────────────────────────
+  const navBtn = t.closest('.match-nav-btn[data-docid]');
+  if (navBtn) {
+    const docId = parseInt(navBtn.dataset.docid, 10);
+    const dir = parseInt(navBtn.dataset.dir, 10);
+    const total = parseInt(navBtn.dataset.total, 10);
+    if (!isNaN(docId)) navigateMatch(docId, dir, total);
+    return;
+  }
+
+  // ── Doc viewer viewer prev/next ────────────────────────────────────
+  if (t.closest('#viewerPrev')) { navigateViewerMatch(-1); return; }
+  if (t.closest('#viewerNext')) { navigateViewerMatch(1); return; }
+
+  // ── Doc viewer close ──────────────────────────────────────────────
+  if (t.closest('#viewerCloseBtn') ||
+    t === document.getElementById('docViewerOverlay')) {
+    closeViewer(e);
+    return;
+  }
+
+  // ── Header buttons ────────────────────────────────────────────────
+  if (t.closest('#headerUploadBtn')) {
+    document.getElementById('fileInput').click();
+    return;
+  }
+  if (t.closest('#headerResetBtn')) {
+    resetSession();
+    return;
+  }
+
+  // ── Sidebar buttons ───────────────────────────────────────────────
+  if (t.closest('#downloadReportBtn')) {
+    downloadReport();
+    return;
+  }
+  if (t.closest('#sidebarResetBtn')) {
+    resetSession();
+    return;
+  }
+
+  // ── Apply correction fix ──────────────────────────────────────────
+  if (t.closest('#applyFix')) {
+    document.getElementById('correctionBanner').style.display = 'none';
+    return;
+  }
+
+  // ── Doc chip remove ────────────────────────────────────────────────
+  if (t.classList.contains('rm') && t.dataset.docid !== undefined) {
+    removeDoc(parseInt(t.dataset.docid, 10));
+    return;
+  }
 });
 
 // ── KEYBOARD SHORTCUTS ────────────────────────────────────────────────
-// Ctrl+K / Cmd+K: focus the search bar (same as Chrome DevTools pattern).
+// Ctrl+K / Cmd+K: focus the active search bar.
 document.addEventListener('keydown', e => {
   if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
     e.preventDefault();
     const inputId = isResultsPage() ? 'resultsInput' : 'homeInput';
     document.getElementById(inputId).focus();
   }
-  // Escape: close document viewer if open.
   if (e.key === 'Escape') closeViewer();
 });
 
+// ── SEARCH BAR SETUP ──────────────────────────────────────────────────
+setupInput('homeInput', 'homeBar', 'homeSuggestions');
+setupInput('resultsInput', 'resultsBar', 'resultsSuggestions');
+
+// ── DROP ZONE + GLOBAL DROP ───────────────────────────────────────────
+setupDrop('sideDropZone');
+setupGlobalDrop();
+
 // ── INITIAL RENDER ────────────────────────────────────────────────────
-// Populate sidebar with zeroed stats and empty history on first load.
 renderHistory();
 updateStats();
 updateDocChips();
+
+console.log("Welcome to David Search Engine.")
