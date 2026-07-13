@@ -13,12 +13,14 @@ CRITICAL RULE: Do not just output code. For every feature, module, or file you g
 * **Seamless User Experience:** Keep the UI responsive during both the text-indexing phase and complex fuzzy search execution.
 
 ## 2. Core Deliverables & Architecture
-* **File Ingestion System:** A drag-and-drop HTML upload zone using the FileReader API to process user-uploaded TXT or JSON files dynamically.
+* **File Ingestion System:** A drag-and-drop HTML upload zone using the FileReader API to process user-uploaded TXT or JSON files dynamically, and pdf files.
 * **Text Preprocessor:** A pipeline that tokenizes text, normalizes casing, strips punctuation, and removes common English stop words.
 * **Inverted Indexing Engine:** A live data structure mapping keywords to document IDs, updating instantly as new files are uploaded.
 * **Fuzzy Matcher:** A typo-tolerant search layer using Levenshtein Distance or Dice's Coefficient to find matches within a 1-to-2 character error margin.
 * **TF-IDF Ranker:** A calculation layer that scores matching documents based on term frequency and document rarity, sorting the best results to the top.
-* **Search Interface:** A polished UI displaying query highlights, file metadata, match scores, and a clear reset button to clear the current session index.
+* **Search Interface:** A polished UI displaying query highlights, file metadata, and a clear reset button to clear the current session index
+Results Page (SERP): Fast-loading interface displaying titles, URLs, snippet descriptions, and visual filters.
+
 
 ## 3. Out of Scope (Exclusions)
 * **Server Storage:** Uploaded files are processed strictly in browser memory; no backend database or cloud storage is utilized.
@@ -41,4 +43,4 @@ For every feature or file you write for me, you must structure your response exa
 1. **The Conceptual 'Why':** Explain why this specific data structure (e.g., Map vs Object) or algorithm is being used. What are the engineering trade-offs?
 2. **The Algorithmic 'How':** A step-by-step breakdown of the logic in plain English. Include the Big-O time and space complexity ($O(N)$, $O(\log N)$, etc.) for this component.
 3. **The Code:** Clean, modern, vanilla JavaScript. Add deep inline comments explaining *why* a certain loop, API, or conditional is structured that way.
-4. **Interview Defense Prep:** Give me two tough technical questions a Senior Engineer might ask me about this specific block of code during a portfolio review, along with the exact ideal answers I should give.
+4. **Interview Defense Prep:** Give me five tough technical questions a Senior Engineer might ask me about this specific block of code during a portfolio review, along with the exact ideal answers I should give.

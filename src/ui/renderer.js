@@ -149,12 +149,7 @@ function renderResults(query, { results, time, correction }) {
           : '<span class="badge-sm badge-exact">✓ Exact match</span>'}
       </div>
 
-      <div class="result-score-row">
-        <div class="score-track" aria-hidden="true">
-          <div class="score-fill" style="width:${r.pct}%"></div>
-        </div>
-        <span class="score-pct">TF-IDF ${r.score.toFixed(4)} · ${r.pct}% relevance</span>
-      </div>
+
 
       <div class="result-snippet">${buildSnippet(r.doc.text, r.terms)}</div>
 

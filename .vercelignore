@@ -1,0 +1,14 @@
+# Git metadata
+.git
+.gitignore
+
+# Dev / repo docs (not needed in the deployed bundle)
+README.md
+SEARCH_ENGINE_SPEC.md
+SKILL.md
+architecture_explainer.md
+
+# IDE / editor artefacts
+.vscode
+.idea
+*.code-workspace
