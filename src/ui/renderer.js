@@ -126,7 +126,9 @@ function renderResults(query, { results, time, correction }) {
     // Build card HTML — data-* attributes power event delegation in main.js
     card.innerHTML = `
       <div class="result-url-row">
-        <div class="result-favicon" aria-hidden="true">📄</div>
+        <div class="result-favicon" aria-hidden="true">
+          <span class="material-icons-round" style="font-size:15px;color:var(--ink-muted)">description</span>
+        </div>
         <div>
           <div class="result-site-name">${escHtml(fileName)}</div>
           <span class="result-breadcrumb">${escHtml(r.doc.name)}</span>
@@ -143,10 +145,10 @@ function renderResults(query, { results, time, correction }) {
       </a>
 
       <div class="result-badges">
-        ${i === 0 ? '<span class="badge-sm badge-top">⭐ Top result</span>' : ''}
+        ${i === 0 ? '<span class="badge-sm badge-top"><span class="material-icons-round" style="font-size:11px;vertical-align:middle;line-height:1">star</span> Top result</span>' : ''}
         ${r.isFuzzy
-          ? '<span class="badge-sm badge-fuzzy">~ Fuzzy match</span>'
-          : '<span class="badge-sm badge-exact">✓ Exact match</span>'}
+          ? '<span class="badge-sm badge-fuzzy"><span class="material-icons-round" style="font-size:11px;vertical-align:middle;line-height:1">auto_fix_high</span> Fuzzy match</span>'
+          : '<span class="badge-sm badge-exact"><span class="material-icons-round" style="font-size:11px;vertical-align:middle;line-height:1">check_circle</span> Exact match</span>'}
       </div>
 
 
@@ -155,7 +157,7 @@ function renderResults(query, { results, time, correction }) {
 
       ${matchCount > 0 ? `
       <div class="match-navigator" data-docid="${r.doc.id}">
-        <span aria-hidden="true">📍</span>
+        <span class="material-icons-round" style="font-size:14px;color:var(--ink-muted)" aria-hidden="true">location_on</span>
         <span class="match-count" id="mc-${r.doc.id}">1 of ${matchCount} match${matchCount !== 1 ? 'es' : ''}</span>
         <button class="match-nav-btn"
           data-docid="${r.doc.id}" data-dir="-1" data-total="${matchCount}"
@@ -421,7 +423,7 @@ function renderHistory() {
     item.className = 'history-item';
     item.dataset.query = h;
     item.innerHTML = `
-      <span class="h-icon" aria-hidden="true">🕐</span>
+      <span class="material-icons-round h-icon" aria-hidden="true" style="font-size:15px">history</span>
       <span>${escHtml(h)}</span>
       <span class="h-remove" data-index="${i}"
         role="button" tabindex="0" aria-label="Remove search: ${escHtml(h)}">×</span>

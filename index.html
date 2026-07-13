@@ -8,11 +8,17 @@
       content="DavSearch — a client-side search engine with TF-IDF ranking, fuzzy typo-tolerance, and a live inverted index built in vanilla JavaScript."
     />
     <title>DavSearch — Client-Side Search Engine</title>
-    <!--
-    Zero external dependencies — spec §1.
-    System fonts used throughout — spec §2.
-    All icons are native inline SVGs — spec §1.
-  -->
+    <!-- Google Fonts: Inter (UI) + Material Icons Round -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/icon?family=Material+Icons+Round"
+      rel="stylesheet"
+    />
     <link rel="stylesheet" href="src/styles/base.css" />
   </head>
 
@@ -24,7 +30,9 @@
   ════════════════════════════════════════════════════════════════ -->
     <div id="globalDropOverlay" class="global-drop-overlay">
       <div class="drop-target-inner">
-        <div class="drop-icon">📂</div>
+        <div class="drop-icon">
+          <span class="material-icons-round" style="font-size:64px">folder_open</span>
+        </div>
         <div class="drop-label">Drop files to index</div>
         <div class="drop-sub">.txt or .md files · max 10 MB each</div>
       </div>
@@ -531,7 +539,9 @@
               tabindex="0"
               aria-label="Click or drag files here to upload"
             >
-              <div class="upload-zone-icon">📁</div>
+              <div class="upload-zone-icon">
+                <span class="material-icons-round">upload_file</span>
+              </div>
               <div>
                 Click or drop <span style="color: var(--accent)">.txt</span> /
                 <span style="color: var(--accent)">.md</span> files here
